@@ -1,0 +1,40 @@
+# --- Secretos (lo más importante) ---
+.env
+*.pem
+*.key
+credentials*
+secrets*
+
+# --- Sistema operativo ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Editores ---
+.idea/
+*.swp
+*~
+
+# --- Python ---
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# --- R ---
+.Rhistory
+.RData
+.Rproj.user/
+
+# --- Logs y temporales ---
+*.log
+*.tmp
+tmp/
+
+# --- Datos pesados y resultados ---
+data/raw/
+results/
+*.fastq.gz
+*.bam
+static/ChemoTRIAGE.png
