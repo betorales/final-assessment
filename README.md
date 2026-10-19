@@ -80,7 +80,11 @@ Una aclaración que me importa, porque es la que me permite dormir tranquilo: **
 | Formularios y CSRF | Flask-WTF |
 | Frontend | CSS propio (Grid y Flexbox) + JavaScript vanilla |
 
-> Sin Bootstrap, sin plantillas y sin React. Las dos primeras ausencias las pide la consigna de la asignatura. La tercera es una decisión: Flask con Jinja2 ya cubre front y back, y agregar una segunda aplicación con su propio build no aportaría nada a lo que se evalúa. La interactividad que el proyecto necesita —ordenar la tabla, filtrar, barra de progreso— se resuelve con unas pocas líneas de JavaScript.
+> [!NOTE] 
+> Sin Bootstrap, sin plantillas y sin React. 
+> Las dos primeras ausencias las pide la consigna de la asignatura. 
+> La tercera es una decisión: Flask con Jinja2 ya cubre front y back, y agregar una segunda aplicación con su propio build no aportaría nada a lo que se evalúa. 
+> La interactividad que el proyecto necesita (ordenar la tabla, filtrar, barra de progreso) se resuelve con unas pocas líneas de JavaScript.
 
 ### Límites declarados
  
