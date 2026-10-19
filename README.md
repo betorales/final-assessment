@@ -102,6 +102,6 @@ Todo software de cheminformática tiene un límite. Los de este están documenta
 
 ## Autor
  
-ALberto Morales - Farmacéutico y docente, estudiante de Analista Programador.
+Alberto Morales - Farmacéutico y docente, estudiante de Analista Programador.
  
 Proyecto individual de final de grado.
