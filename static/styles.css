@@ -1,22 +1,1518 @@
-*{margin: 0; padding: 0;}
-body{color: rgb(208, 136, 136); height: 100vh;}
-nav{width: 100%; height: 30px; background-color: rgb(0, 98, 255); text-align: center; justify-items: center;}
-.home-container{
-    display: flex; 
-    flex-direction: row; 
-    column-gap: 50px;
-    width: 100%;
-    height: 100%;
-    padding: 0 10px;
-    
-    > .img {
-        background: url('ChemoTRIAGE.png') center/contain no-repeat;
-        flex: 60%;
-        height: 100%;
-    }
-    
-    > .form{
-        flex: 40%;
-        height: 100%;
-    }
+/* ============================================================================
+   TRIAJE DE QUIMIOTECAS — hoja de estilos única
+   ----------------------------------------------------------------------------
+   CSS propio: sin Bootstrap, sin frameworks, sin plantillas.
+   Mobile-first: el estilo base es el de 390px y se amplía con `min-width`.
+   Todos los valores salen de los tokens del bloque 01. Ninguna regla de
+   componente escribe un color, espaciado o radio literal.
+
+   Las fuentes se cargan en `base.html`, no desde acá (un @import bloquea el
+   render). En el <head> de la plantilla base:
+
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+     <link rel="stylesheet" href="{{ url_for('static', filename='static/styles.css') }}">
+
+   ÍNDICE
+     01  Tokens
+     02  Reset y base
+     03  Tipografía
+     04  Layout de página
+     05  Cabecera y navegación
+     06  Botones
+     07  Formularios
+     08  Tarjetas y paneles
+     09  Métricas de resumen
+     10  Aviso destacado
+     11  Chips de filtro
+     12  Estados, violaciones y alertas
+     13  Tabla de resultados y su reflujo a tarjetas
+     14  Panel de detalle
+     15  Progreso por lotes
+     16  Mensajes y estados vacíos
+     17  Paginación
+     18  Pie
+     19  Utilidades
+     20  Pantalla de inicio de sesión
+     21  Impresión
+   ========================================================================= */
+
+
+/* ============================================================================
+   01  TOKENS
+   ========================================================================= */
+
+:root {
+  /* --- Superficies --- */
+  --surface-canvas: #f3f3f0;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f7f7f4;
+  --surface-selected: #ecece5;
+
+  /* --- Texto --- */
+  --ink-primary: #1b1b1b;
+  --ink-secondary: #474747;
+  --ink-muted: #5c5c5c;
+  --ink-inverse: #ffffff;
+
+  /* --- Bordes --- */
+  --border-hairline: #dadad5;   /* decorativo: contorno de tarjeta */
+  --border-divider: #e6e6e1;    /* línea entre filas */
+  --border-control: #86867f;    /* 3,66:1 — único borde válido en un control */
+
+  /* --- Acento --- */
+  --accent: #22303c;
+  --accent-on: var(--ink-inverse);
+  --accent-muted: #e6e9ec;
+  --accent-hover: #2d3d4b;      /* 11,17:1 con texto blanco */
+
+  /* --- Estados --- */
+  --state-pass: #1d4c80;
+  --state-pass-bg: #e4edf8;
+  --state-fail: #8a3606;
+  --state-fail-bg: #fbe7d8;
+  --state-warn: var(--ink-secondary);
+  --state-out-of-scope: var(--ink-muted);
+  --focus-ring: #1d4c80;
+
+  /* --- Tipografía --- */
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* --- Espaciado (escala de 4px) --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* --- Radios --- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+
+  /* --- Grosores de borde --- */
+  --bw-hairline: 1px;
+  --bw-emphasis: 2px;
+  --bw-focus: 3px;
+
+  /* --- Layout --- */
+  --layout-max: 1392px;
+  --touch-target: 44px;
+
+  /* --- Sombra (solo capas flotantes) --- */
+  --shadow-overlay: 0 4px 16px rgba(27, 27, 26, 0.18);
+}
+
+
+/* ============================================================================
+   02  RESET Y BASE
+   ========================================================================= */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--surface-canvas);
+  color: var(--ink-primary);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 22px;
+}
+
+h1, h2, h3, h4, p, ul, ol, figure, fieldset { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+fieldset { border: 0; padding: 0; min-width: 0; }
+legend { padding: 0; }
+img, svg { display: block; max-width: 100%; }
+
+a {
+  color: var(--state-pass);
+  text-underline-offset: 3px;
+}
+a:hover { color: var(--ink-primary); }
+
+/* Foco visible en todo elemento accionable. Nunca se usa `outline: none`
+   sin reemplazo: focus-ring da 8,76:1 sobre blanco. */
+:focus-visible {
+  outline: var(--bw-focus) solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+::placeholder { color: var(--ink-muted); opacity: 1; }
+
+/* Todo elemento accionable mide al menos 44px de alto, también en escritorio. */
+button,
+.boton,
+.enlace-nav,
+summary { min-height: var(--touch-target); }
+
+/* Enlace de salto al contenido: primer elemento del <body>. */
+.salta-enlace {
+  position: absolute;
+  left: var(--space-4);
+  top: calc(-1 * var(--touch-target) - var(--space-4));
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--accent-on);
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 120ms ease;
+}
+.salta-enlace:focus { top: var(--space-4); color: var(--accent-on); }
+
+
+/* ============================================================================
+   03  TIPOGRAFÍA
+   Clases de un solo propósito, equivalentes a los estilos del sistema.
+   Regla dura: toda cifra, SMILES o SMARTS va en --font-mono. En una
+   tipografía proporcional los dígitos tienen anchos distintos y la columna
+   de descriptores deja de poder leerse en vertical.
+   ========================================================================= */
+
+.display {
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.heading     { font-size: 22px; line-height: 28px; font-weight: 600; }
+.subheading  { font-size: 18px; line-height: 24px; font-weight: 600; }
+.body-strong { font-weight: 600; }
+.body-sm     { font-size: 14px; line-height: 20px; }
+.caption     { font-size: 13px; line-height: 18px; color: var(--ink-secondary); }
+.micro       { font-size: 12px; line-height: 16px; color: var(--ink-secondary); }
+
+.label {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-secondary);
+}
+
+.metric {
+  font-family: var(--font-mono);
+  font-size: 30px;
+  line-height: 34px;
+  font-weight: 500;
+}
+.dato        { font-family: var(--font-mono); font-size: 13px; line-height: 18px; }
+.dato-lg     { font-family: var(--font-mono); font-size: 14px; line-height: 20px; }
+.dato-strong { font-family: var(--font-mono); font-size: 13px; line-height: 18px; font-weight: 600; }
+
+/* SMILES, SMARTS, InChIKey. No se parte a mitad de cadena con break-all:
+   anywhere permite el corte sin romper las palabras del texto normal. */
+.code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.texto-apoyo { color: var(--ink-secondary); }
+.texto-meta  { color: var(--ink-muted); font-size: 13px; line-height: 18px; }
+
+@media (min-width: 768px) {
+  .display { font-size: 30px; line-height: 36px; }
+  .metric  { font-size: 34px; line-height: 38px; }
+}
+
+
+/* ============================================================================
+   04  LAYOUT DE PÁGINA
+   ========================================================================= */
+
+/* `min-height`, nunca `height`: con altura fija el contenido más alto que la
+   ventana se desborda fuera de la caja. Y `dvh` antes que `vh`, porque en
+   móvil `100vh` cuenta la barra del navegador y recorta el final de la
+   página. El orden importa: el navegador que no entiende dvh usa vh. */
+.pagina {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.contenedor {
+  width: 100%;
+  max-width: var(--layout-max);
+  margin-inline: auto;
+  padding-inline: var(--space-4);
+}
+
+.contenido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding-block: var(--space-5) var(--space-12);
+}
+
+/* Cabecera de pantalla: título a la izquierda, acciones a la derecha.
+   Se apilan solas cuando no entran, sin media query. */
+.encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+.encabezado > .encabezado-texto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.encabezado > .acciones { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.encabezado > .acciones > * { flex: 1 1 auto; }
+
+/* Dos columnas que se reparten solas: la principal se queda con el espacio
+   sobrante (flex-grow 999) y se va a su propia línea al bajar de su base.
+   `min-width: 0` es obligatorio: sin eso, una tabla ancha o un SMILES largo
+   impide que el hijo se encoja y aparece scroll horizontal de página. */
+.dos-columnas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  align-items: flex-start;
+}
+.dos-columnas > .columna-principal { flex: 999 1 640px; min-width: 0; }
+.dos-columnas > .columna-lateral   { flex: 1 1 320px;   min-width: 0; }
+
+/* Cuadrícula que se cuenta sola: sin puntos de quiebre. */
+.grilla-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+.grilla-campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.ruta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.ruta a { color: var(--ink-secondary); }
+
+@media (min-width: 768px) {
+  .contenedor { padding-inline: var(--space-6); }
+  .contenido  { gap: var(--space-6); padding-block: var(--space-6) var(--space-12); }
+  .encabezado > .acciones > * { flex: 0 0 auto; }
+}
+
+
+/* ============================================================================
+   05  CABECERA Y NAVEGACIÓN
+   Cuatro enlaces: se envuelven con flex-wrap en lugar de esconderse en un
+   menú hamburguesa. Más simple y no oculta nada.
+   ========================================================================= */
+
+.cabecera {
+  background: var(--surface-raised);
+  border-bottom: var(--bw-hairline) solid var(--border-hairline);
+}
+.cabecera > .contenedor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-6);
+  min-height: 64px;
+  padding-block: var(--space-2);
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  color: var(--ink-primary);
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.marca:hover { color: var(--ink-primary); }
+
+.nav-principal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+}
+.enlace-nav {
+  display: flex;
+  align-items: center;
+  padding-inline: var(--space-3);
+  color: var(--ink-secondary);
+  text-decoration: none;
+}
+.enlace-nav:hover { color: var(--ink-primary); }
+.enlace-nav[aria-current="page"] {
+  color: var(--ink-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: var(--bw-emphasis);
+  text-underline-offset: 8px;
+}
+
+.boton-usuario {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+  border: var(--bw-hairline) solid var(--border-control);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  color: var(--ink-primary);
+  text-decoration: none;
+  cursor: pointer;
+}
+.boton-usuario > .avatar {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--surface-selected);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+.boton-usuario > .identidad {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+}
+.boton-usuario .rol { font-size: 12px; color: var(--ink-muted); }
+
+
+/* ============================================================================
+   06  BOTONES
+   ========================================================================= */
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding-inline: var(--space-4);
+  border: var(--bw-hairline) solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--ink-primary);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.boton:hover { background: var(--surface-sunken); color: var(--ink-primary); }
+
+.boton--primario {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-on);
+  font-weight: 600;
+}
+.boton--primario:hover { background: var(--ink-primary); border-color: var(--ink-primary); color: var(--accent-on); }
+
+.boton--sobre-acento {
+  border-color: var(--ink-inverse);
+  background: var(--ink-inverse);
+  color: var(--ink-primary);
+  font-weight: 600;
+}
+.boton--fantasma-acento {
+  border-color: var(--ink-inverse);
+  background: transparent;
+  color: var(--ink-inverse);
+}
+.boton--fantasma-acento:hover { background: var(--accent-hover); color: var(--ink-inverse); }
+
+.boton--icono {
+  width: var(--touch-target);
+  padding-inline: 0;
+  flex: none;
+}
+
+.boton--bloque { width: 100%; }
+
+.boton[disabled],
+.boton[aria-disabled="true"] {
+  border-color: var(--border-hairline);
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+  cursor: not-allowed;
+}
+
+.boton > svg { flex: none; }
+
+
+/* ============================================================================
+   07  FORMULARIOS
+   ========================================================================= */
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.campo > label,
+.leyenda {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+.campo .ayuda {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+.requerido { color: var(--state-fail); }
+
+.control {
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  border: var(--bw-hairline) solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--ink-primary);
+  font-size: 15px;
+  line-height: 22px;
+}
+textarea.control { min-height: calc(var(--touch-target) * 2); resize: vertical; }
+
+/* Única excepción a la regla de «ningún literal fuera de los tokens»: un
+   data URI no puede leer una propiedad personalizada, así que el color del
+   galón va escrito (%231b1b1b = --ink-primary). Si cambia ese token, hay
+   que cambiarlo también acá. */
+select.control {
+  appearance: none;
+  padding-right: var(--space-8);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%231b1b1b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+}
+
+.control[readonly],
+.control[disabled] {
+  border-style: dashed;
+  background: var(--surface-sunken);
+  color: var(--ink-secondary);
+}
+
+/* Error: borde, texto y vínculo con aria-describedby. El color nunca va solo. */
+.control[aria-invalid="true"] { border-color: var(--state-fail); border-width: var(--bw-emphasis); }
+.mensaje-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--state-fail);
+}
+.mensaje-error > svg { flex: none; margin-top: 2px; }
+
+/* Contraseña con botón de mostrar al lado. */
+.campo-con-boton { display: flex; gap: var(--space-2); }
+.campo-con-boton > .control { flex: 1; min-width: 0; }
+
+.casilla {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+.casilla > input[type="checkbox"],
+.casilla > input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--accent);
+}
+
+/* Zona de carga de archivo: el <input type="file"> va oculto con .sr-only
+   y la etiqueta asociada es la zona visible. */
+.zona-archivo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  border: var(--bw-emphasis) dashed var(--border-control);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  text-align: center;
+  cursor: pointer;
+}
+.zona-archivo:hover { background: var(--surface-selected); }
+.zona-archivo .formatos { font-size: 13px; line-height: 18px; color: var(--ink-muted); }
+
+.grupo-criterios {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--bw-hairline) solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+}
+
+
+/* ============================================================================
+   08  TARJETAS Y PANELES
+   Los planos se separan con bordes, no con sombras.
+   ========================================================================= */
+
+.tarjeta {
+  background: var(--surface-raised);
+  border: var(--bw-hairline) solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+}
+.tarjeta--relleno { padding: var(--space-4); }
+.tarjeta--apilada {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.tarjeta-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--bw-hairline) solid var(--border-hairline);
+}
+.tarjeta-pie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-secondary);
+}
+
+/* Barra de criterios del perfil aplicado. */
+.barra-criterios {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-raised);
+  border: var(--bw-hairline) solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+}
+.criterio {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 18px;
+  padding: var(--space-1) var(--space-3);
+  border: var(--bw-hairline) solid var(--border-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .tarjeta--relleno,
+  .tarjeta--apilada { padding: var(--space-6); }
+  .tarjeta-cabecera,
+  .tarjeta-pie { padding-inline: var(--space-5); }
+}
+
+
+/* ============================================================================
+   09  MÉTRICAS DE RESUMEN
+   ========================================================================= */
+
+.metrica {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: var(--bw-hairline) solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+}
+.metrica > .titulo { font-size: 13px; line-height: 18px; color: var(--ink-secondary); }
+.metrica > .nota   { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.metrica .metric--pass { color: var(--state-pass); }
+.metrica .metric--fail { color: var(--state-fail); }
+
+
+/* ============================================================================
+   10  AVISO DESTACADO
+   El aviso de «estos compuestos cumplen el perfil bRo5»: es la propuesta de
+   valor del sistema, y por eso es lo único que usa el acento a sangre.
+   ========================================================================= */
+
+.aviso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--accent);
+  color: var(--accent-on);
+}
+.aviso-cuerpo {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  flex: 999 1 520px;
+  min-width: 0;
+}
+.aviso-cuerpo > svg { flex: none; margin-top: 2px; }
+.aviso-texto { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.aviso-texto > .titulo { font-size: 16px; line-height: 22px; font-weight: 600; }
+.aviso-texto > .detalle { font-size: 14px; line-height: 20px; color: var(--accent-muted); }
+.aviso .acciones { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.aviso .acciones > * { flex: 1 1 auto; }
+
+@media (min-width: 768px) {
+  .aviso {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4) var(--space-6);
+    padding: var(--space-5);
+  }
+  .aviso .acciones > * { flex: 0 0 auto; }
+}
+
+
+/* ============================================================================
+   11  CHIPS DE FILTRO
+   ========================================================================= */
+
+.filtros {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  margin-inline: calc(-1 * var(--space-4));
+  padding: 0 var(--space-4) var(--space-1);
+  scrollbar-width: thin;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  min-height: var(--touch-target);
+  padding-inline: var(--space-3);
+  border: var(--bw-hairline) solid var(--border-control);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  color: var(--ink-primary);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chip > .cuenta { font-family: var(--font-mono); font-size: 13px; color: var(--ink-muted); }
+.chip[aria-pressed="true"] {
+  border-color: var(--ink-primary);
+  background: var(--ink-primary);
+  color: var(--ink-inverse);
+}
+.chip[aria-pressed="true"] > .cuenta { color: var(--surface-selected); }
+
+.buscador {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding-inline: var(--space-3);
+  border: var(--bw-hairline) solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.buscador > svg { flex: none; color: var(--ink-muted); }
+.buscador > input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+@media (min-width: 768px) {
+  .filtros { overflow-x: visible; flex-wrap: wrap; margin-inline: 0; padding: 0; }
+}
+
+
+/* ============================================================================
+   12  ESTADOS, VIOLACIONES Y ALERTAS
+   Ningún estado se distingue solo por color: cada uno suma icono, peso o
+   estilo de borde, de modo que sobrevive a la escala de grises y a la
+   deuteranopia. Aprobado es azul y rechazado terracota, no verde y rojo.
+   ========================================================================= */
+
+.estado {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.estado > svg { flex: none; }
+.estado--aprobado { color: var(--state-pass); background: var(--state-pass-bg); }
+.estado--rechazado { color: var(--state-fail); background: var(--state-fail-bg); }
+.estado--fuera-alcance { color: var(--state-out-of-scope); background: var(--surface-sunken); }
+
+/* El motivo acompaña siempre al estado. Una etiqueta sin motivo no es un
+   estado válido de este sistema. */
+.resultado {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.resultado > .motivo { font-size: 13px; line-height: 18px; color: var(--ink-secondary); }
+
+/* Valor que supera el umbral: se resalta la celda, no la fila. Así una fila
+   con cuatro violaciones muestra cuáles son las cuatro. */
+.violacion {
+  padding: 2px 5px;
+  border-radius: var(--radius-sm);
+  background: var(--state-fail-bg);
+  color: var(--state-fail);
+  font-weight: 600;
+}
+
+/* Alertas: PAINS descarta (borde continuo), BRENK advierte (discontinuo).
+   El estilo de borde carga la diferencia, no el color. */
+.alerta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+}
+.alerta > svg { flex: none; }
+.alerta--pains {
+  border: var(--bw-hairline) solid var(--state-fail);
+  color: var(--state-fail);
+  font-weight: 600;
+}
+.alerta--brenk {
+  border: var(--bw-hairline) dashed var(--border-control);
+  color: var(--state-warn);
+}
+
+/* Leyenda del resaltado, arriba de la tabla. */
+.leyenda-resaltado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: var(--bw-hairline) solid var(--border-hairline);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-secondary);
+}
+
+
+/* ============================================================================
+   13  TABLA DE RESULTADOS Y SU REFLUJO A TARJETAS
+   ----------------------------------------------------------------------------
+   La tabla tiene diez columnas y no entra en 390px. La salida fácil sería
+   `overflow-x: auto`, pero la columna que se iría de la vista es Resultado,
+   que es la razón por la que alguien abre esta pantalla.
+   Por eso el estilo BASE (móvil) es una tarjeta por compuesto, y la tabla
+   real aparece desde 890px.
+
+   Markup esperado — un solo <table> para los dos modos. Los `role` van
+   explícitos porque al cambiar `display` el navegador descarta la semántica
+   de tabla, y un lector de pantalla necesita el encabezado de columna para
+   anunciar «TPSA, 278,80»:
+
+     <table class="tabla-resultados" role="table">
+       <thead role="rowgroup">
+         <tr role="row">
+           <th role="columnheader" scope="col">Estructura</th>
+           <th role="columnheader" scope="col">Compuesto</th>
+           <th role="columnheader" scope="col" class="col-num">MW</th>
+           ... LogP, HBD, HBA, TPSA, RotB, QED ...
+           <th role="columnheader" scope="col">Resultado</th>
+         </tr>
+       </thead>
+       <tbody role="rowgroup">
+         <tr role="row">
+           <td role="cell" class="celda-estructura"><img ...></td>
+           <td role="cell" class="celda-compuesto">...</td>
+           <td role="cell" class="celda-dato col-num" data-label="MW">
+             <span class="dato violacion">1202,63</span></td>
+           ...
+           <td role="cell" class="celda-qed col-num" data-label="QED">...</td>
+           <td role="cell" class="celda-resultado">...</td>
+         </tr>
+       </tbody>
+     </table>
+   ========================================================================= */
+
+.tabla-envoltorio {
+  background: var(--surface-raised);
+  border: var(--bw-hairline) solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.tabla-resultados {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* --- Modo tarjeta (base, hasta 889px) --- */
+
+.tabla-resultados,
+.tabla-resultados thead,
+.tabla-resultados tbody,
+.tabla-resultados tr,
+.tabla-resultados th,
+.tabla-resultados td { display: block; }
+
+.tabla-resultados thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.tabla-resultados tbody tr {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-bottom: var(--bw-hairline) solid var(--border-divider);
+}
+.tabla-resultados tbody tr:last-child { border-bottom: 0; }
+
+.celda-estructura { grid-column: span 2; }
+.celda-compuesto  { grid-column: span 4; }
+.celda-dato       { grid-column: span 2; }
+.celda-resultado  { grid-column: 1 / -1; }
+
+/* QED no participa del filtro: se oculta en tarjeta para que los seis
+   descriptores evaluados queden en dos filas limpias de tres. */
+.celda-qed { display: none; }
+
+/* En tarjeta, cada dato se rotula con su columna. */
+.tabla-resultados .celda-dato::before {
+  content: attr(data-label);
+  display: block;
+  font-size: 11px;
+  line-height: 15px;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+}
+.tabla-resultados .celda-dato {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+/* Si el dato viola el umbral, la celda entera toma el fondo de la violación. */
+.tabla-resultados .celda-dato:has(.violacion) { background: var(--state-fail-bg); }
+
+.celda-estructura > img {
+  width: 100%;
+  height: 64px;
+  object-fit: contain;
+  background: var(--surface-raised);
+  border: var(--bw-hairline) solid var(--border-divider);
+  border-radius: var(--radius-md);
+}
+
+.compuesto {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+.compuesto > .nombre {
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--ink-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--border-control);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.compuesto > .identificadores {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+
+/* --- Modo tabla (desde 890px) --- */
+
+@media (min-width: 890px) {
+  .tabla-resultados { display: table; }
+  .tabla-resultados thead {
+    display: table-header-group;
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+    overflow: visible;
+  }
+  .tabla-resultados tbody { display: table-row-group; }
+  .tabla-resultados tr { display: table-row; }
+  .tabla-resultados th,
+  .tabla-resultados td { display: table-cell; }
+
+  .tabla-resultados tbody tr {
+    padding: 0;
+    border-bottom: var(--bw-hairline) solid var(--border-divider);
+  }
+
+  .tabla-resultados th {
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface-sunken);
+    border-bottom: var(--bw-hairline) solid var(--border-hairline);
+    text-align: left;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-secondary);
+    white-space: nowrap;
+  }
+  .tabla-resultados td {
+    padding: var(--space-2) var(--space-3);
+    vertical-align: middle;
+  }
+
+  /* Las cifras se alinean a la derecha para poder compararse en vertical. */
+  .col-num { text-align: right; }
+
+  .tabla-resultados .celda-dato::before { content: none; }
+  .tabla-resultados .celda-dato,
+  .tabla-resultados .celda-dato:has(.violacion) {
+    padding: var(--space-2) var(--space-3);
+    background: transparent;
+    border-radius: 0;
+  }
+  .celda-qed { display: table-cell; color: var(--ink-secondary); }
+
+  .celda-estructura { width: 100px; }
+  .celda-estructura > img {
+    width: 84px;
+    height: 56px;
+  }
+
+  .tabla-resultados tbody tr[aria-selected="true"] { background: var(--surface-selected); }
+}
+
+/* Entre 890px y el ancho mínimo real de la tabla, se desplaza dentro de su
+   propia caja, nunca la página entera. */
+.tabla-scroll { overflow-x: auto; }
+@media (min-width: 890px) {
+  .tabla-scroll > .tabla-resultados { min-width: 890px; }
+}
+
+
+/* ============================================================================
+   14  PANEL DE DETALLE
+   ========================================================================= */
+
+.panel-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: var(--bw-hairline) solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+}
+.panel-detalle > img {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: contain;
+  border: var(--bw-hairline) solid var(--border-divider);
+  border-radius: var(--radius-md);
+}
+
+/* Lista de criterios evaluados: icono, nombre, valor y límite. */
+.lista-criterios {
+  border: var(--bw-hairline) solid var(--border-divider);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.lista-criterios > li {
+  display: grid;
+  grid-template-columns: 18px 56px 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--bw-hairline) solid var(--border-divider);
+  font-size: 14px;
+  line-height: 20px;
+}
+.lista-criterios > li:last-child { border-bottom: 0; }
+.lista-criterios .nombre-criterio { font-weight: 600; }
+.lista-criterios .valor { font-family: var(--font-mono); font-size: 13px; }
+.lista-criterios .limite { font-family: var(--font-mono); font-size: 13px; color: var(--ink-muted); }
+.lista-criterios li[data-cumple="no"] .valor,
+.lista-criterios li[data-cumple="no"] .icono { color: var(--state-fail); font-weight: 600; }
+
+.bloque-comparacion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+/* Recordatorio permanente: el sistema clasifica, no predice. */
+.nota-alcance {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-secondary);
+}
+
+
+/* ============================================================================
+   15  PROGRESO POR LOTES
+   Los compuestos se evalúan en lotes de 100 para no exceder el tiempo de
+   respuesta del hosting. El avance se informa también en texto.
+   ========================================================================= */
+
+.progreso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: var(--bw-hairline) dashed var(--border-control);
+  border-radius: var(--radius-md);
+}
+.progreso-cabecera {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+.progreso-barra {
+  height: 14px;
+  border: var(--bw-hairline) solid var(--border-control);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+.progreso-barra > .relleno {
+  height: 100%;
+  background: var(--accent);
+  transition: width 200ms linear;
+}
+
+
+/* ============================================================================
+   16  MENSAJES Y ESTADOS VACÍOS
+   ========================================================================= */
+
+.flash {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: var(--bw-hairline) solid var(--border-control);
+  border-left-width: var(--bw-focus);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  font-size: 14px;
+  line-height: 20px;
+}
+.flash > svg { flex: none; margin-top: 2px; }
+.flash--exito { border-left-color: var(--state-pass); }
+.flash--error { border-left-color: var(--state-fail); color: var(--state-fail); font-weight: 600; }
+
+.vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  color: var(--ink-secondary);
+}
+.vacio > .titulo { font-size: 18px; line-height: 24px; font-weight: 600; color: var(--ink-primary); }
+
+/* Resumen de validación tras una carga. */
+.resumen-validacion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--bw-hairline) solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.resumen-validacion .conteos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-2);
+}
+.resumen-validacion .conteo {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2);
+  border: var(--bw-hairline) solid var(--border-divider);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+.resumen-validacion .conteo > .cifra { font-family: var(--font-mono); font-size: 18px; font-weight: 600; }
+.resumen-validacion .conteo > .titulo { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+.lista-rechazos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 13px;
+  line-height: 18px;
+}
+.lista-rechazos > li { display: flex; align-items: center; gap: var(--space-2); }
+
+
+/* ============================================================================
+   17  PAGINACIÓN
+   ========================================================================= */
+
+.paginacion { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.paginacion a,
+.paginacion span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  padding-inline: var(--space-2);
+  border: var(--bw-hairline) solid var(--border-control);
+  border-radius: var(--radius-md);
+  color: var(--ink-primary);
+  font-size: 14px;
+  text-decoration: none;
+}
+.paginacion [aria-current="page"] {
+  background: var(--ink-primary);
+  border-color: var(--ink-primary);
+  color: var(--ink-inverse);
+  font-weight: 600;
+}
+.paginacion [aria-disabled="true"] { color: var(--ink-muted); border-color: var(--border-hairline); }
+
+
+/* ============================================================================
+   18  PIE
+   ========================================================================= */
+
+.pie {
+  margin-top: auto;
+  background: var(--surface-raised);
+  border-top: var(--bw-hairline) solid var(--border-hairline);
+}
+.pie > .contenedor {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block: var(--space-5);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+
+
+/* ============================================================================
+   19  UTILIDADES
+   ========================================================================= */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.pila        { display: flex; flex-direction: column; gap: var(--space-4); }
+.pila--justa { gap: var(--space-2); }
+.fila        { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.fila--entre { justify-content: space-between; }
+.empuja      { margin-left: auto; }
+.sin-margen  { margin: 0; }
+.ancho-total { width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/* ============================================================================
+   20  PANTALLA DE INICIO DE SESIÓN
+   ----------------------------------------------------------------------------
+   Mantiene los nombres de clase que ya tenés (`.home-container`, `.img`,
+   `.form`), así que tu plantilla actual sigue funcionando sin tocarla.
+
+   Dos cambios de comportamiento respecto de tu versión:
+
+   1. En móvil se APILA. Con `flex-direction: row` fijo y `flex: 60% / 40%`,
+      en 390px la imagen y el formulario se reparten el ancho y los dos
+      quedan ilegibles. Acá la fila aparece desde 890px.
+   2. Los campos ocupan el 100%, no el 80%. Con `box-sizing: border-box` el
+      relleno y el borde entran dentro del ancho declarado, así que el 80%
+      ya no es necesario para evitar el desborde: era un parche.
+
+   La imagen se referencia como `../img/ChemoTRIAGE.png`, porque una ruta en
+   un CSS se resuelve respecto del archivo CSS, no de la plantilla. Si la
+   dejás en `static/css/` junto a la hoja, volvé a poner `ChemoTRIAGE.png`.
+   ========================================================================= */
+
+.home-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--space-5) var(--space-4);
+  box-sizing: border-box;
+}
+
+.home-container > .img {
+  flex: 0 0 auto;
+  min-height: 160px;
+  background: var(--surface-selected) url("../img/ChemoTRIAGE.png") center / contain no-repeat;
+  border: var(--bw-hairline) solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+}
+
+.home-container > .form {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  background: var(--surface-raised);
+  border: var(--bw-hairline) solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+}
+
+/* Las reglas del formulario quedan acotadas a esta pantalla: en el resto de
+   la aplicación el contenedor es `.formulario` (sección 07). */
+.home-container form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.home-container form input,
+.home-container form select,
+.home-container form button {
+  width: 100%;
+}
+
+.home-container .pie-formulario {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 14px;
+  line-height: 20px;
+}
+.home-container .pie-formulario a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--touch-target);
+}
+
+.home-container .registro {
+  padding-top: var(--space-4);
+  border-top: var(--bw-hairline) solid var(--border-hairline);
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
+}
+
+@media (min-width: 890px) {
+  .home-container {
+    flex-direction: row;
+    align-items: stretch;
+    gap: var(--space-8);
+    padding: var(--space-8);
+  }
+  .home-container > .img  { flex: 6 1 0; min-height: 0; }
+  .home-container > .form { flex: 4 1 0; max-width: 460px; }
+}
+
+/* Mientras tu <nav> no tenga clase, estas reglas lo dejan presentable y
+   accesible. Al pasarlo a `.cabecera` (sección 05) estas dejan de aplicar
+   solas, sin conflicto. */
+body > nav:not([class]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1) var(--space-4);
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-raised);
+  border-bottom: var(--bw-hairline) solid var(--border-hairline);
+}
+body > nav:not([class]) a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  padding-inline: var(--space-2);
+  color: var(--ink-secondary);
+  text-decoration: none;
+}
+body > nav:not([class]) a:hover { color: var(--ink-primary); }
+
+
+/* ============================================================================
+   21  IMPRESIÓN
+   La tabla de resultados se imprime como anexo del informe: se despliega
+   completa, con bordes y sin cromática de fondo.
+   ========================================================================= */
+
+@media print {
+  :root {
+    --surface-canvas: #ffffff;
+    --surface-raised: #ffffff;
+    --surface-sunken: #ffffff;
+    --surface-selected: #ffffff;
+  }
+
+  body { font-size: 10pt; line-height: 14pt; }
+
+  .cabecera .nav-principal,
+  .cabecera .boton-usuario,
+  body > nav:not([class]),
+  .salta-enlace,
+  .filtros,
+  .buscador,
+  .paginacion,
+  .acciones,
+  .aviso .acciones { display: none !important; }
+
+  .tarjeta,
+  .tabla-envoltorio,
+  .panel-detalle { border-color: var(--ink-secondary); break-inside: avoid; }
+
+  /* La tabla real, en cualquier ancho de papel. */
+  .tabla-resultados { display: table !important; font-size: 9pt; }
+  .tabla-resultados thead {
+    display: table-header-group !important;
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    clip-path: none !important;
+  }
+  .tabla-resultados tbody { display: table-row-group !important; }
+  .tabla-resultados tr    { display: table-row !important; padding: 0 !important; }
+  .tabla-resultados th,
+  .tabla-resultados td    { display: table-cell !important; }
+  .tabla-resultados .celda-dato::before { content: none !important; }
+  .celda-qed { display: table-cell !important; }
+  .tabla-resultados tr { break-inside: avoid; }
+
+  /* El resaltado de violación debe sobrevivir a la impresión: si el
+     navegador descarta los fondos, queda el subrayado y el peso. */
+  .violacion {
+    background: transparent;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+  }
+
+  a { color: var(--ink-primary); text-decoration: underline; }
 }
