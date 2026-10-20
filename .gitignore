@@ -38,3 +38,4 @@ results/
 *.fastq.gz
 *.bam
 static/ChemoTRIAGE.png
+static/logo.svg

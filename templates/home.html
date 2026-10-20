@@ -7,11 +7,13 @@ Home
 {% block content %}
 
 <div class="home-container">
-    <div class="img">
-    </div>
+    <div class="img"></div>
 
     <div class="form">
-        <div>ChemoTRIAGE</div>
+        <div class="logo">
+            <img src="{{url_for('static',filename='logo.svg')}}" alt="" style="width: 48px; aspect-ratio: 1 / 1;">
+            <p>ChemoTRIAGE</p>
+        </div>
         <h2>Sign In</h2>
         <form action="">
             <label for="">Email</label>

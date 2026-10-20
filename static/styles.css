@@ -6,14 +6,6 @@
    Todos los valores salen de los tokens del bloque 01. Ninguna regla de
    componente escribe un color, espaciado o radio literal.
 
-   Las fuentes se cargan en `base.html`, no desde acá (un @import bloquea el
-   render). En el <head> de la plantilla base:
-
-     <link rel="preconnect" href="https://fonts.googleapis.com">
-     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-     <link rel="stylesheet" href="{{ url_for('static', filename='static/styles.css') }}">
-
    ÍNDICE
      01  Tokens
      02  Reset y base
@@ -240,10 +232,6 @@ summary { min-height: var(--touch-target); }
    04  LAYOUT DE PÁGINA
    ========================================================================= */
 
-/* `min-height`, nunca `height`: con altura fija el contenido más alto que la
-   ventana se desborda fuera de la caja. Y `dvh` antes que `vh`, porque en
-   móvil `100vh` cuenta la barra del navegador y recorta el final de la
-   página. El orden importa: el navegador que no entiende dvh usa vh. */
 .pagina {
   display: flex;
   flex-direction: column;
@@ -520,10 +508,11 @@ summary { min-height: var(--touch-target); }
 }
 textarea.control { min-height: calc(var(--touch-target) * 2); resize: vertical; }
 
-/* Única excepción a la regla de «ningún literal fuera de los tokens»: un
+/* CONSIDERAR: Única excepción a la regla de «ningún literal fuera de los tokens»: un
    data URI no puede leer una propiedad personalizada, así que el color del
    galón va escrito (%231b1b1b = --ink-primary). Si cambia ese token, hay
    que cambiarlo también acá. */
+
 select.control {
   appearance: none;
   padding-right: var(--space-8);
@@ -1337,23 +1326,7 @@ select.control {
 
 /* ============================================================================
    20  PANTALLA DE INICIO DE SESIÓN
-   ----------------------------------------------------------------------------
-   Mantiene los nombres de clase que ya tenés (`.home-container`, `.img`,
-   `.form`), así que tu plantilla actual sigue funcionando sin tocarla.
-
-   Dos cambios de comportamiento respecto de tu versión:
-
-   1. En móvil se APILA. Con `flex-direction: row` fijo y `flex: 60% / 40%`,
-      en 390px la imagen y el formulario se reparten el ancho y los dos
-      quedan ilegibles. Acá la fila aparece desde 890px.
-   2. Los campos ocupan el 100%, no el 80%. Con `box-sizing: border-box` el
-      relleno y el borde entran dentro del ancho declarado, así que el 80%
-      ya no es necesario para evitar el desborde: era un parche.
-
-   La imagen se referencia como `../img/ChemoTRIAGE.png`, porque una ruta en
-   un CSS se resuelve respecto del archivo CSS, no de la plantilla. Si la
-   dejás en `static/css/` junto a la hoja, volvé a poner `ChemoTRIAGE.png`.
-   ========================================================================= */
+   ---------------------------------------------------------------------------- */
 
 .home-container {
   display: flex;
@@ -1369,7 +1342,7 @@ select.control {
 .home-container > .img {
   flex: 0 0 auto;
   min-height: 160px;
-  background: var(--surface-selected) url("../img/ChemoTRIAGE.png") center / contain no-repeat;
+  background: var(--surface-selected) url("./ChemoTRIAGE.png") center / contain no-repeat;
   border: var(--bw-hairline) solid var(--border-hairline);
   border-radius: var(--radius-lg);
 }
@@ -1434,9 +1407,6 @@ select.control {
   .home-container > .form { flex: 4 1 0; max-width: 460px; }
 }
 
-/* Mientras tu <nav> no tenga clase, estas reglas lo dejan presentable y
-   accesible. Al pasarlo a `.cabecera` (sección 05) estas dejan de aplicar
-   solas, sin conflicto. */
 body > nav:not([class]) {
   display: flex;
   flex-wrap: wrap;
@@ -1448,6 +1418,7 @@ body > nav:not([class]) {
   background: var(--surface-raised);
   border-bottom: var(--bw-hairline) solid var(--border-hairline);
 }
+
 body > nav:not([class]) a {
   display: inline-flex;
   align-items: center;
