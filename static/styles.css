@@ -346,6 +346,12 @@ summary { min-height: var(--touch-target); }
 }
 .marca:hover { color: var(--ink-primary); }
 
+.marca-logo {
+  height: 50px;
+  width: auto;
+  flex: none;
+}
+
 .nav-principal {
   display: flex;
   flex-wrap: wrap;
@@ -1331,6 +1337,7 @@ select.control {
 .home-container {
   display: flex;
   flex-direction: column;
+  flex: 1 0 auto;
   gap: var(--space-5);
   width: 100%;
   min-height: 100vh;

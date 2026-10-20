@@ -1,28 +1,32 @@
-{% extends 'base.html'%}
-
-{% block title %}
-Home
-{% endblock %}
-
-{% block content %}
-
-<div class="home-container">
-    <div class="img"></div>
-
-    <div class="form">
-        <div class="logo">
-            <img src="{{url_for('static',filename='logo.svg')}}" alt="" style="width: 48px; aspect-ratio: 1 / 1;">
-            <p>ChemoTRIAGE</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+    <link rel="stylesheet" href="{{url_for('static',filename='styles.css')}}">
+</head>
+<body class="pagina">
+    
+    <main id="contenido" class="contenedor contenido">
+        <div class="home-container">
+        <div class="img"></div>
+    
+        <div class="form">
+            <div class="logo">
+                <img src="{{url_for('static',filename='logo-horizontal.svg')}}" alt="">
+            </div>
+            <h2>Sign In</h2>
+            <form action="">
+                <label for="">Email</label>
+                <input type="text" name="" id="" placeholder="youremail@yourdomain.com">
+                <label for="">Password</label>
+                <input type="password" name="" id="">
+                <button>Log In</button>
+            </form>
         </div>
-        <h2>Sign In</h2>
-        <form action="">
-            <label for="">Email</label>
-            <input type="text" name="" id="" placeholder="youremail@yourdomain.com">
-            <label for="">Password</label>
-            <input type="password" name="" id="">
-            <button>Log In</button>
-        </form>
     </div>
-</div>
+    </main>
+</body>
+</html>
 
-{% endblock %}

@@ -8,10 +8,22 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-     <link rel="icon" type="image/svg+xml" href="{{url_for('static',filename='logo.svg')}}">
+     <link rel="icon" type="image/svg+xml" href="{{url_for('static',filename='favicon.svg')}}">
 </head>
-<body>
-    {% block content %}
-    {% endblock %}
+<body class="pagina">
+    <header class="cabecera">
+        <div class="contenedor">
+            <a href="{{url_for('libraries')}}" class="marca">
+                <img src="{{url_for('static',filename='logo-horizontal.svg')}}" alt="" class="marca-logo">
+            </a>
+            {% block nav %}
+            {% endblock %}
+            <a href="/profile" class="boton-usuario">Profile</a>
+        </div>
+    </header>
+    <main id="contenido" class="contenedor contenido">
+        {% block content %}
+        {% endblock %}
+    </main>
 </body>
 </html>
