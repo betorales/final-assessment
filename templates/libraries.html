@@ -10,6 +10,151 @@ Libraries
 
 {% block content %}
 
-<h1>LIBRARIES</h1>
+{% from "_macros.html" import form_field, alert_icon, pagination_nav %}
+
+<div class="page-header">
+  <div class="page-header-text">
+    <h1 class="display">Libraries</h1>
+    <p class="text-secondary">Compound libraries uploaded from SMILES files, with their validation results.</p>
+  </div>
+  <div class="actions">
+    <a class="button button--primary" href="#upload">+ New library</a>
+  </div>
+</div>
+
+{% if summary %}
+<section class="validation-summary" aria-labelledby="summary-title">
+  <h2 id="summary-title" class="subheading">Upload of “{{ summary.name }}”</h2>
+  <div class="counts">
+    <div class="count-card"><span class="title">Loaded</span><span class="number">{{ summary.loaded }}</span></div>
+    <div class="count-card"><span class="title">Duplicates</span><span class="number">{{ summary.duplicates }}</span></div>
+    <div class="count-card"><span class="title">Invalid</span><span class="number">{{ summary.invalid }}</span></div>
+    <div class="count-card"><span class="title">Out of scope</span><span class="number">{{ summary.out_of_scope }}</span></div>
+  </div>
+  {% if summary.rejections %}
+  <ul class="rejection-list">
+    {% for r in summary.rejections[:10] %}
+    <li>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+      <span>Line {{ r.line }}: {{ r.reason }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% if summary.rejections|length > 10 %}
+  <p class="caption">And {{ summary.rejections|length - 10 }} more lines with problems.</p>
+  {% endif %}
+  {% endif %}
+</section>
+{% endif %}
+
+
+<div class="two-columns">
+  <section class="main-column card" aria-labelledby="list-title">
+
+    <div class="card-header">
+      <h2 id="list-title" class="subheading">My libraries</h2>
+      <form class="search-box" role="search" method="get" action="{{ url_for('libraries') }}">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        <label class="sr-only" for="q">Search libraries</label>
+        <input id="q" name="q" type="search" value="{{ q or '' }}" placeholder="Search by name">
+      </form>
+    </div>
+
+    {% if pagination.items %}
+    {# Explicit roles: on mobile the table is shown as blocks, and changing
+       display makes the browser drop the table semantics. #}
+    <table class="table" role="table" aria-labelledby="list-title">
+      <thead role="rowgroup">
+        <tr role="row">
+          <th role="columnheader" scope="col">Name</th>
+          <th role="columnheader" scope="col" class="col-num">Compounds</th>
+          <th role="columnheader" scope="col">Uploaded</th>
+          <th role="columnheader" scope="col">Actions</th>
+        </tr>
+      </thead>
+      <tbody role="rowgroup">
+        {% for b in pagination.items %}
+        <tr role="row">
+          <td role="cell" class="cell-title">
+            <a href="{{ url_for('see_library', id=b.id) }}">{{ b.name }}</a>
+          </td>
+          <td role="cell" class="col-num" data-label="Compounds">
+            <span class="data">{{ b.compound_count }}</span>
+          </td>
+          <td role="cell" data-label="Uploaded">
+            <time datetime="{{ b.uploaded_at.isoformat() }}">{{ b.uploaded_at.strftime('%d %b %Y') }}</time>
+          </td>
+          <td role="cell" class="cell-actions">
+            <div class="row-actions">
+              <a class="button" href="{{ url_for('screenings', library=b.id) }}">Screen<span class="sr-only"> {{ b.name }}</span></a>
+              {# Delete is a POST, never a link: browser prefetching or a crawler can follow a GET. #}
+              <form method="post" action="{{ url_for('delete_library', id=b.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="button button--icon" aria-label="Delete {{ b.name }}">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 14h10l1-14"></path></svg>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="card-footer">
+      <span>Showing {{ pagination.items|length }} of {{ pagination.total }}</span>
+      {{ pagination_nav(pagination, 'libraries', q=q) }}
+    </div>
+
+    {% else %}
+    <div class="empty-state">
+      {% if q %}
+      <p class="title">No libraries match “{{ q }}”</p>
+      <a href="{{ url_for('libraries') }}">See all libraries</a>
+      {% else %}
+      <p class="title">No libraries uploaded yet</p>
+      <a href="#upload">Upload the first one</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </section>
+
+
+  <section id="upload" class="side-column card card--stacked" aria-labelledby="upload-title">
+    <h2 id="upload-title" class="subheading">Upload library</h2>
+
+    {# Without enctype, request.files arrives empty. novalidate turns off the
+       browser's validation bubbles so the server's errors are shown instead. #}
+    <form class="form-stack" method="post" action="{{ url_for('upload_libraries') }}" enctype="multipart/form-data" novalidate>
+      {{ form.hidden_tag() }}
+
+      {{ form_field(form.name, placeholder="e.g. Kinase inhibitors, batch 3") }}
+
+      {{ form_field(form.description, rows=3, placeholder="Where the molecules come from and what the screening is for") }}
+
+      {# Not the macro: the control sits inside the drop zone. #}
+      <div class="field">
+        <label for="{{ form.file.id }}">
+          {{- form.file.label.text -}}
+          {%- if form.file.flags.required %} <span class="required" aria-hidden="true">*</span>{% endif -%}
+        </label>
+        <div class="file-drop">
+          <p class="formats" id="file-help">One SMILES per line, in .smi, .csv or .txt. Up to 200 heavy atoms per molecule.</p>
+          {{ form.file(class="file-control",
+                       accept=".smi,.csv,.txt",
+                       aria_describedby=("file-help file-error" if form.file.errors else "file-help"),
+                       aria_invalid=("true" if form.file.errors else False)) }}
+        </div>
+        {% if form.file.errors %}
+        <p class="error-message" id="file-error">{{ alert_icon() }}<span>{{ form.file.errors[0] }}</span></p>
+        {% endif %}
+      </div>
+
+      <button type="submit" class="button button--primary button--block">Upload and validate</button>
+    </form>
+  </section>
+
+</div>
 
 {% endblock %}

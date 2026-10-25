@@ -1,0 +1,14 @@
+# Demo set: 12 compounds, one SMILES per line followed by its name.
+# Test file for library upload and reference compounds for the alert preview.
+CC(=O)Oc1ccccc1C(=O)O Aspirin
+CC(=O)Nc1ccc(O)cc1 Paracetamol
+CC(C)Cc1ccc(cc1)C(C)C(=O)O Ibuprofen
+CN1C(=O)CN=C(c2ccccc2)c2cc(Cl)ccc21 Diazepam
+COc1ccc2[nH]c(S(=O)Cc3ncc(C)c(OC)c3C)nc2c1 Omeprazole
+CN(C)C(=N)NC(=N)N Metformin
+CC(C)c1c(C(=O)Nc2ccccc2)c(-c2ccccc2)c(-c2ccc(F)cc2)n1CC[C@@H](O)C[C@@H](O)CC(=O)O Atorvastatin
+Cc1ccc(NC(=O)c2ccc(CN3CCN(C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1 Imatinib
+CC[C@H]1OC(=O)[C@H](C)[C@@H](O[C@H]2C[C@@](C)(OC)[C@@H](O)[C@H](C)O2)[C@H](C)[C@@H](O[C@@H]2O[C@H](C)C[C@H](N(C)C)[C@H]2O)[C@](C)(O)C[C@@H](C)C(=O)[C@H](C)[C@@H](O)[C@]1(C)O Erythromycin
+CO[C@H]1C[C@@H]2CC[C@@H](C)[C@@](O)(O2)C(=O)C(=O)N2CCCC[C@H]2C(=O)O[C@H]([C@H](C)C[C@@H]2CC[C@@H](O)[C@H](OC)C2)CC(=O)[C@H](C)/C=C(\C)[C@@H](O)[C@@H](OC)C(=O)[C@H](C)C[C@H](C)/C=C/C=C/C=C/1C Sirolimus
+C/C=C/C[C@@H](C)[C@@H](O)[C@H]1C(=O)N[C@@H](CC)C(=O)N(C)CC(=O)N(C)[C@@H](CC(C)C)C(=O)N[C@@H](C(C)C)C(=O)N(C)[C@@H](CC(C)C)C(=O)N[C@@H](C)C(=O)N[C@H](C)C(=O)N(C)[C@@H](CC(C)C)C(=O)N(C)[C@@H](CC(C)C)C(=O)N(C)[C@@H](C(C)C)C(=O)N1C Ciclosporin
+O=C1NC(=S)SC1=Cc1ccccc1 5-Benzylidenerhodanine

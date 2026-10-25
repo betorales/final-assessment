@@ -1,42 +1,65 @@
-# --- Secretos (lo más importante) ---
+# --- Secrets ---
 .env
+.env.*
+!.env.example
 *.pem
 *.key
 credentials*
 secrets*
 
-# --- Sistema operativo ---
+# --- Operating system ---
 .DS_Store
+._*
 Thumbs.db
 desktop.ini
 
-# --- Editores ---
+# --- Editors ---
 .idea/
+.vscode/
 *.swp
 *~
 
 # --- Python ---
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+build/
+dist/
 .ipynb_checkpoints/
 .venv/
 venv/
+env/
+
+# --- Tests and linters ---
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- Flask and local databases ---
+instance/
+*.db
+*.sqlite3
+*.dump
 
 # --- R ---
 .Rhistory
 .RData
 .Rproj.user/
 
-# --- Logs y temporales ---
+# --- Logs and temporary files ---
 *.log
 *.tmp
 tmp/
 
-# --- Datos pesados y resultados ---
+# --- Large data and results ---
 data/raw/
 results/
 *.fastq.gz
 *.bam
+
+# --- Images (uploaded to the host separately) ---
 static/ChemoTRIAGE.png
 static/favicon.svg
 static/logo-horizontal.svg

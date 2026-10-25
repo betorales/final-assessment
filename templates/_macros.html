@@ -1,0 +1,67 @@
+{#
+  Reusable form macros. Import them inside each template's block:
+    {% from "_macros.html" import form_field, alert_icon %}
+
+  form_field(field, help_text=None, **attributes)
+    Renders a Flask-WTF field's label, control, help text and error.
+      - The asterisk appears only when the field has DataRequired or
+        InputRequired (field.flags.required), so "required" is declared
+        once, in the Python form.
+      - aria-describedby points to the help text and the error when they
+        exist; aria-invalid is set only when there is an error.
+    Any other attribute (placeholder, rows, autocomplete…) goes straight to
+    the control.
+#}
+
+{% macro alert_icon() -%}
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
+{%- endmacro %}
+
+
+{% macro form_field(field, help_text=none) -%}
+{%- set ids = [] -%}
+{%- if help_text %}{% set _ = ids.append(field.id ~ "-help") %}{% endif -%}
+{%- if field.errors %}{% set _ = ids.append(field.id ~ "-error") %}{% endif -%}
+<div class="field">
+  <label for="{{ field.id }}">
+    {{- field.label.text -}}
+    {%- if field.flags.required %} <span class="required" aria-hidden="true">*</span>{% endif -%}
+  </label>
+  {{ field(class="control",
+           aria_describedby=(ids|join(" ") if ids else False),
+           aria_invalid=("true" if field.errors else False),
+           **kwargs) }}
+  {%- if help_text %}
+  <p class="help" id="{{ field.id }}-help">{{ help_text }}</p>
+  {%- endif %}
+  {%- if field.errors %}
+  <p class="error-message" id="{{ field.id }}-error">{{ alert_icon() }}<span>{{ field.errors[0] }}</span></p>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{% macro pagination_nav(pagination, endpoint) -%}
+{%- if pagination.pages > 1 %}
+<nav class="pagination" aria-label="Pagination">
+  {% if pagination.has_prev -%}
+  <a href="{{ url_for(endpoint, page=pagination.prev_num, **kwargs) }}" aria-label="Previous page">‹</a>
+  {%- else -%}
+  <span aria-disabled="true">‹</span>
+  {%- endif %}
+  {% for n in pagination.iter_pages() -%}
+    {% if n is none -%}
+  <span class="ellipsis" aria-hidden="true">…</span>
+    {%- elif n == pagination.page -%}
+  <span aria-current="page">{{ n }}</span>
+    {%- else -%}
+  <a href="{{ url_for(endpoint, page=n, **kwargs) }}">{{ n }}</a>
+    {%- endif %}
+  {% endfor -%}
+  {% if pagination.has_next -%}
+  <a href="{{ url_for(endpoint, page=pagination.next_num, **kwargs) }}" aria-label="Next page">›</a>
+  {%- else -%}
+  <span aria-disabled="true">›</span>
+  {%- endif %}
+</nav>
+{%- endif %}
+{%- endmacro %}

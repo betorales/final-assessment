@@ -10,6 +10,97 @@ Profile
 
 {% block content %}
 
-<h1>PROFILE</h1>
+{% from "_macros.html" import form_field %}
+
+<div class="page-header">
+  <div class="page-header-text">
+    <h1 class="display">My account</h1>
+  </div>
+</div>
+
+{# Curator only. These are links between pages, not tabs that show and hide
+   content, so they go in a <nav> with aria-current. #}
+{% if is_curator %}
+<nav class="tabs" aria-label="Account sections">
+  <a href="{{ url_for('profile') }}" aria-current="page">My profile</a>
+  <a href="{{ url_for('users') }}">User management</a>
+</nav>
+{% endif %}
+
+<div class="two-columns">
+
+  <aside class="side-column card card--stacked account-summary" aria-label="Account summary">
+    <span class="avatar-large" aria-hidden="true">{{ initials }}</span>
+
+    <div class="stack stack--tight">
+      <p class="heading">{{ user.name }}</p>
+      <p><span class="role-badge">{{ role }}</span></p>
+      <p class="text-meta">
+        {%- if user.institution %}{{ user.institution }} · {% endif -%}
+        Member since {{ user.created_at.strftime('%d %b %Y') }}
+      </p>
+    </div>
+
+    <dl class="stats">
+      <div><dt>Libraries</dt><dd>{{ stats.libraries }}</dd></div>
+      <div><dt>Screenings</dt><dd>{{ stats.screenings }}</dd></div>
+      <div><dt>Own profiles</dt><dd>{{ stats.profiles }}</dd></div>
+    </dl>
+
+    {# TODO (login): point to the sign-out route. #}
+    <a class="button button--block" href="{{ url_for('home') }}">Sign out</a>
+  </aside>
+
+
+  <div class="main-column stack">
+
+    <section class="card card--stacked" aria-labelledby="account-title">
+      <h2 id="account-title" class="subheading">Personal details</h2>
+
+      <form class="form-stack" method="post" action="{{ url_for('profile') }}" novalidate>
+        {{ account_form.hidden_tag() }}
+        <div class="field-grid">
+          {{ form_field(account_form.name, autocomplete="name") }}
+          {{ form_field(account_form.email, autocomplete="email") }}
+          {{ form_field(account_form.institution, autocomplete="organization") }}
+
+          {# The role is not a form field, so it is shown as text rather than a disabled input. #}
+          <div class="field">
+            <span class="field-label">Role</span>
+            <p class="static-value">{{ role }}</p>
+            <p class="help">Only a curator can change it.</p>
+          </div>
+        </div>
+
+        <div class="row">
+          <button type="submit" class="button button--primary">Save changes</button>
+          <a class="button" href="{{ url_for('profile') }}">Discard changes</a>
+        </div>
+      </form>
+    </section>
+
+
+    <section class="card card--stacked" aria-labelledby="password-title">
+      <h2 id="password-title" class="subheading">Change password</h2>
+
+      {# current-password / new-password let the browser's password manager
+         fill in the saved one and suggest a new one. #}
+      <form class="form-stack" method="post" action="{{ url_for('change_password') }}" novalidate>
+        {{ password_form.hidden_tag() }}
+        <div class="field-medium">
+          {{ form_field(password_form.current_password, autocomplete="current-password") }}
+        </div>
+        <div class="field-grid">
+          {{ form_field(password_form.new_password, autocomplete="new-password", help_text="At least 8 characters, including a number.") }}
+          {{ form_field(password_form.confirm_password, autocomplete="new-password") }}
+        </div>
+        <div>
+          <button type="submit" class="button button--primary">Update password</button>
+        </div>
+      </form>
+    </section>
+
+  </div>
+</div>
 
 {% endblock %}

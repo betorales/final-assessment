@@ -6,22 +6,27 @@
     <title>{% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="{{url_for('static',filename='styles.css')}}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-     <link rel="icon" type="image/svg+xml" href="{{url_for('static',filename='favicon.svg')}}">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+    <link rel="icon" type="image/svg+xml" href="{{url_for('static',filename='favicon.svg')}}">
 </head>
-<body class="pagina">
-    <header class="cabecera">
-        <div class="contenedor">
-            <a href="{{url_for('libraries')}}" class="marca">
-                <img src="{{url_for('static',filename='logo-horizontal.svg')}}" alt="" class="marca-logo">
+<body class="page">
+    <header class="site-header">
+        <div class="container">
+            <a href="{{url_for('libraries')}}" class="brand">
+                <img src="{{url_for('static',filename='logo-horizontal.svg')}}" alt="" class="brand-logo">
             </a>
             {% block nav %}
             {% endblock %}
-            <a href="/profile" class="boton-usuario">Profile</a>
+            <a href="/profile" class="user-button">Profile ▾</a>
         </div>
     </header>
-    <main id="contenido" class="contenedor contenido">
+    <main id="content" class="container content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+        <div class="flash flash--{{ category }}" role="status">{{ message }}</div>
+        {% endfor %}
+        {% endwith %}
         {% block content %}
         {% endblock %}
     </main>

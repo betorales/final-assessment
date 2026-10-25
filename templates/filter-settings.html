@@ -10,6 +10,123 @@ Filter Settings
 
 {% block content %}
 
-<h1>FILTER SETTINGS</h1>
+{% from "_macros.html" import form_field, alert_icon %}
+
+<div class="page-header">
+  <div class="page-header-text">
+    <h1 class="display">Filter profiles</h1>
+    <p class="text-secondary">Each profile defines the thresholds and rules used to evaluate a library.</p>
+  </div>
+</div>
+
+<div class="two-columns">
+
+  {# Choosing a profile loads it into the form: an own profile to edit it, an
+     official one as the base of a new profile. No JavaScript needed. #}
+  <nav class="side-column card card--stacked" aria-label="Profile list">
+    <a class="button button--block" href="{{ url_for('filter_settings') }}">New profile</a>
+
+    <div class="stack stack--tight">
+      <h2 class="label" id="official-title">Official</h2>
+      <ul class="profile-list" aria-labelledby="official-title">
+        {% for p in official_profiles %}
+        <li>
+          <a href="{{ url_for('filter_settings', profile=p.id) }}"{% if p.id == selected_id %} aria-current="true"{% endif %}>{{ p.name }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="stack stack--tight">
+      <h2 class="label" id="own-title">My profiles</h2>
+      {% if own_profiles %}
+      <ul class="profile-list" aria-labelledby="own-title">
+        {% for p in own_profiles %}
+        <li>
+          <a href="{{ url_for('filter_settings', profile=p.id) }}"{% if p.id == selected_id %} aria-current="true"{% endif %}>{{ p.name }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-meta">No profiles of your own yet.</p>
+      {% endif %}
+    </div>
+  </nav>
+
+
+  <section class="main-column card card--stacked" aria-labelledby="form-title">
+    <div class="stack stack--tight">
+      <h2 id="form-title" class="heading">
+        {%- if editing %}Edit “{{ editing.name }}”
+        {%- elif base %}New profile based on “{{ base.name }}”
+        {%- else %}New filter profile{% endif -%}
+      </h2>
+      {% if base %}
+      <p class="caption">The thresholds were copied from the official profile. Give it a name and adjust what you need.</p>
+      {% endif %}
+    </div>
+
+    {% if form.form_errors %}
+    <div class="flash flash--error" role="alert">
+      {{ alert_icon() }}
+      <span>{{ form.form_errors[0] }}</span>
+    </div>
+    {% endif %}
+
+    {# No action attribute: the form posts to the same URL, ?profile=… included,
+       so the view knows which profile is being saved. #}
+    <form class="form-stack" method="post" novalidate>
+      {{ form.hidden_tag() }}
+
+      {{ form_field(form.name, placeholder="e.g. Oral, less restrictive") }}
+      {{ form_field(form.description, rows=2, placeholder="What kind of molecules this profile is for") }}
+
+      <fieldset class="criteria-group" aria-describedby="thresholds-help">
+        <legend class="field-label">Descriptor thresholds</legend>
+        <p class="caption" id="thresholds-help">An empty field is not evaluated. At least one threshold is required.</p>
+        <div class="field-grid field-grid--compact">
+          {{ form_field(form.mw_max, placeholder="—") }}
+          {{ form_field(form.logp_min, placeholder="—") }}
+          {{ form_field(form.logp_max, placeholder="—") }}
+          {{ form_field(form.hbd_max, placeholder="—") }}
+          {{ form_field(form.hba_max, placeholder="—") }}
+          {{ form_field(form.tpsa_max, placeholder="—") }}
+          {{ form_field(form.rotb_max, placeholder="—") }}
+        </div>
+      </fieldset>
+
+      <fieldset class="criteria-group">
+        <legend class="field-label">Rules</legend>
+        <div class="field-short">
+          {{ form_field(form.allowed_violations, help_text="Thresholds a compound can fail and still pass.") }}
+        </div>
+        <div class="checkbox">
+          {{ form.apply_alerts(aria_describedby="alerts-help") }}
+          <div>
+            <label for="{{ form.apply_alerts.id }}">{{ form.apply_alerts.label.text }}</label>
+            <p class="text-meta" id="alerts-help">Each alert applies with its own severity: PAINS discards the compound, BRENK only warns.</p>
+          </div>
+        </div>
+      </fieldset>
+
+      {# Only a curator sees this checkbox; the view also enforces it. #}
+      {% if is_curator %}
+      <div class="checkbox">
+        {{ form.is_official(aria_describedby="official-help") }}
+        <div>
+          <label for="{{ form.is_official.id }}">{{ form.is_official.label.text }}</label>
+          <p class="text-meta" id="official-help">Visible to all users.</p>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="row">
+        <button type="submit" class="button button--primary">{{ "Save changes" if editing else "Save profile" }}</button>
+        <a class="button" href="{{ url_for('filter_settings') }}">Cancel</a>
+      </div>
+    </form>
+  </section>
+
+</div>
 
 {% endblock %}

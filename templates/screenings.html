@@ -10,6 +10,97 @@ Screenings
 
 {% block content %}
 
-<h1>SCREENINGS</h1>
+{% from "_macros.html" import form_field, pagination_nav %}
+
+<div class="page-header">
+  <div class="page-header-text">
+    <h1 class="display">Screenings</h1>
+    <p class="text-secondary">Apply a filter profile to a library and review previous runs.</p>
+  </div>
+</div>
+
+
+<section class="card card--stacked" aria-labelledby="new-title">
+  <h2 id="new-title" class="subheading">New screening</h2>
+
+  {# The first choice is the "Choose…" placeholder: if it is the only one,
+     there are no libraries yet. #}
+  {% if form.library.choices|length > 1 %}
+  <form class="form-inline" method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ form_field(form.library) }}
+    {{ form_field(form.filter_profile) }}
+    <button type="submit" class="button button--primary">Run screening</button>
+  </form>
+  {% else %}
+  <div class="empty-state">
+    <p class="title">No libraries to screen yet</p>
+    <a href="{{ url_for('libraries') }}">Upload a library</a>
+  </div>
+  {% endif %}
+</section>
+
+
+<section class="card" aria-labelledby="history-title">
+
+  <div class="card-header">
+    <h2 id="history-title" class="subheading">History</h2>
+    <form class="search-box" role="search" method="get" action="{{ url_for('screenings') }}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+      <label class="sr-only" for="q">Search history</label>
+      <input id="q" name="q" type="search" value="{{ q or '' }}" placeholder="Search library or profile">
+    </form>
+  </div>
+
+  {% if pagination.items %}
+  <table class="table" role="table" aria-labelledby="history-title">
+    <thead role="rowgroup">
+      <tr role="row">
+        <th role="columnheader" scope="col">Library</th>
+        <th role="columnheader" scope="col">Profile</th>
+        <th role="columnheader" scope="col">Date</th>
+        <th role="columnheader" scope="col" class="col-num">Evaluated</th>
+        <th role="columnheader" scope="col" class="col-num">Passed</th>
+        <th role="columnheader" scope="col">Actions</th>
+      </tr>
+    </thead>
+    <tbody role="rowgroup">
+      {% for s in pagination.items %}
+      <tr role="row">
+        <td role="cell" class="cell-title">{{ s.library }}</td>
+        <td role="cell" data-label="Profile">{{ s.profile }}</td>
+        <td role="cell" data-label="Date">
+          <time datetime="{{ s.created_at.isoformat() }}">{{ s.created_at.strftime('%d %b %Y, %H:%M') }}</time>
+        </td>
+        <td role="cell" class="col-num" data-label="Evaluated"><span class="data">{{ s.total_evaluated }}</span></td>
+        <td role="cell" class="col-num" data-label="Passed"><span class="data">{{ s.total_passed }}</span></td>
+        <td role="cell" class="cell-actions">
+          <div class="row-actions">
+            <a class="button" href="{{ url_for('see_screening', id=s.id) }}">View results<span class="sr-only"> for {{ s.library }} with {{ s.profile }}</span></a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="card-footer">
+    <span>Showing {{ pagination.items|length }} of {{ pagination.total }}</span>
+    {{ pagination_nav(pagination, 'screenings', q=q) }}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    {% if q %}
+    <p class="title">No screenings match “{{ q }}”</p>
+    <a href="{{ url_for('screenings') }}">See the full history</a>
+    {% else %}
+    <p class="title">No screenings yet</p>
+    <p>Your first run will show up here.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</section>
 
 {% endblock %}

@@ -9,4 +9,133 @@ Alerts
 {% endblock %}
 
 {% block content %}
+
+{% from "_macros.html" import form_field, pagination_nav %}
+
+<div class="page-header">
+  <div class="page-header-text">
+    <h1 class="display">Structural alerts</h1>
+    <p class="text-secondary">Substructures that flag known problems. Each one discards or warns according to its severity.</p>
+  </div>
+</div>
+
+<div class="two-columns">
+
+  <section class="main-column card" aria-labelledby="catalog-title">
+
+    <div class="card-header">
+      <h2 id="catalog-title" class="subheading">Catalog</h2>
+      <form class="search-box" role="search" method="get" action="{{ url_for('alerts') }}">
+        {# Keeps the family filter when searching. #}
+        {% if family %}<input type="hidden" name="family" value="{{ family }}">{% endif %}
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        <label class="sr-only" for="q">Find alert</label>
+        <input id="q" name="q" type="search" value="{{ q or '' }}" placeholder="Search by name">
+      </form>
+    </div>
+
+    <div class="card-filters">
+      <nav class="filters" aria-label="Filter by family">
+        {% for f in families %}
+        <a class="chip" href="{{ url_for('alerts', family=f.key, q=q) }}"{% if f.key == family %} aria-current="true"{% endif %}>{{ f.label }} <span class="count">{{ f.count }}</span></a>
+        {% endfor %}
+      </nav>
+    </div>
+
+    {% if catalog.items %}
+    <table class="table" role="table" aria-labelledby="catalog-title">
+      <thead role="rowgroup">
+        <tr role="row">
+          <th role="columnheader" scope="col">Name</th>
+          <th role="columnheader" scope="col">Family</th>
+          <th role="columnheader" scope="col">Severity</th>
+          <th role="columnheader" scope="col" class="col-num">Matches</th>
+          <th role="columnheader" scope="col">Status</th>
+          <th role="columnheader" scope="col">Actions</th>
+        </tr>
+      </thead>
+      <tbody role="rowgroup">
+        {% for a in catalog.items %}
+        <tr role="row"{% if not a.active %} class="row-inactive"{% endif %}>
+          <td role="cell" class="cell-title">{{ a.name }}</td>
+          <td role="cell" data-label="Family">{{ a.family|replace('_', ' ') }}</td>
+          <td role="cell" data-label="Severity">
+            <span class="alert alert--{{ a.severity }} alert--word">{{ a.severity|capitalize }}</span>
+          </td>
+          <td role="cell" class="col-num" data-label="Matches"><span class="data">{{ a.matches }}</span></td>
+          <td role="cell" data-label="Status">{{ "Active" if a.active else "Inactive" }}</td>
+          <td role="cell" class="cell-actions">
+            <div class="row-actions">
+              {# Deactivate instead of delete: compound_alert rows and past
+                 screenings still point to this alert. #}
+              <form method="post" action="{{ url_for('toggle_alert', id=a.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="button">{{ "Deactivate" if a.active else "Activate" }}<span class="sr-only"> {{ a.name }}</span></button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="card-footer">
+      <span>Showing {{ catalog.items|length }} of {{ catalog.total }}</span>
+      {{ pagination_nav(catalog, 'alerts', family=family, q=q) }}
+    </div>
+
+    {% else %}
+    <div class="empty-state">
+      <p class="title">No alerts match the filter</p>
+      <a href="{{ url_for('alerts') }}">See the full catalog</a>
+    </div>
+    {% endif %}
+
+  </section>
+
+
+  <section class="side-column card card--stacked" aria-labelledby="new-alert-title">
+    <h2 id="new-alert-title" class="subheading">New alert</h2>
+
+    <form class="form-stack" method="post" novalidate>
+      {{ form.hidden_tag() }}
+
+      {{ form_field(form.family) }}
+      {{ form_field(form.severity, help_text="Discard rejects the compound. Warning flags it without rejecting it.") }}
+      {{ form_field(form.name, placeholder="e.g. aliphatic_aldehyde") }}
+
+      <div class="field-code">
+        {{ form_field(form.smarts, rows=2, placeholder="e.g. [CX3H1](=O)[#6]",
+                      spellcheck="false", autocomplete="off", autocapitalize="off") }}
+      </div>
+
+      {{ form_field(form.description, rows=2, placeholder="Why this substructure is a problem") }}
+      {{ form_field(form.reference, placeholder="Citation or DOI") }}
+
+      {% if preview is not none %}
+      <div class="comparison-block">
+        <span class="body-strong">Preview</span>
+        {% if preview.matches %}
+        <p class="body-sm">Matches {{ preview.matches|length }} of {{ preview.total }} loaded compounds:</p>
+        <ul class="stack stack--tight caption">
+          {% for name in preview.matches[:10] %}
+          <li>{{ name }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="body-sm">No matches among the {{ preview.total }} loaded compounds.</p>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {# "Test pattern" comes first because it is the button Enter triggers. #}
+      <div class="row">
+        <button type="submit" name="action" value="preview" class="button">Test pattern</button>
+        <button type="submit" name="action" value="save" class="button button--primary">Save alert</button>
+      </div>
+    </form>
+  </section>
+
+</div>
+
 {% endblock %}

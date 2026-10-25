@@ -1,5 +1,8 @@
-<nav class="nav-principal">
-    <a href="/libraries">Libraries</a>
-    <a href="/filter-settings">Filter settings</a>
-    <a href="/screenings">Screenings</a>
+<nav class="main-nav">
+    <a href="{{url_for('libraries')}}" class="nav-link">Libraries</a>
+    <a href="{{url_for('filter_settings')}}" class="nav-link">Filter settings</a>
+    <a href="{{url_for('screenings')}}" class="nav-link">Screenings</a>
+    {% if is_curator %}
+    <a href="{{url_for('alerts')}}" class="nav-link">Alerts</a>
+    {% endif %}
 </nav>
