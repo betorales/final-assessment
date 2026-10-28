@@ -63,3 +63,6 @@ results/
 static/ChemoTRIAGE.png
 static/favicon.svg
 static/logo-horizontal.svg
+
+# --- SQL files ---
+*.sql

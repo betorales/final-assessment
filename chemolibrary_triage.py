@@ -5,14 +5,18 @@ from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
+# ----- FLASK APP ------
 from flask import Flask, abort, flash, redirect, render_template, request, url_for
 from flask_wtf import CSRFProtect, FlaskForm
 from flask_wtf.file import FileAllowed, FileField, FileRequired
 from werkzeug.security import check_password_hash, generate_password_hash
-from wtforms import (BooleanField, DecimalField, EmailField, IntegerField, PasswordField,
-                     SelectField, StringField, TextAreaField)
-from wtforms.validators import (DataRequired, EqualTo, InputRequired, Length, NumberRange,
-                                Optional, Regexp, ValidationError)
+from wtforms import (BooleanField, DecimalField, EmailField, IntegerField, PasswordField, SelectField, StringField, TextAreaField)
+from wtforms.validators import (DataRequired, EqualTo, InputRequired, Length, NumberRange, Optional, Regexp, ValidationError)
+
+# ----- DATABASE -----
+from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import CheckConstraint, Computed, Identity, MetaData, func
 
 app = Flask(__name__)
 
@@ -20,6 +24,32 @@ app = Flask(__name__)
 # In production the key comes from the environment; the fallback is for local use only.
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-only-change-me")
 CSRFProtect(app)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "postgresql+psycopg:///chemotriage")
+# ------ END ------
+
+# ------ DB CONFIG ------
+# Predictable constraint names, so later migrations can find them.
+db = SQLAlchemy(app, metadata=MetaData(naming_convention={
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s",
+}))
+migrate = Migrate(app, db)
+
+# Heavy atoms var
+MAX_HEAVY_ATOMS = 200
+
+class Compound(db.Model):
+    id = db.Column(db.Integer, Identity(always=True), primary_key=True)
+    canonical_smiles = db.Column(db.Text, nullable=False, unique=True)
+    inchikey = db.Column(db.String(27), index=True)
+    heavy_atoms = db.Column(db.SmallInteger, nullable=False)
+    out_of_scope = db.Column(db.Boolean, Computed(f"heavy_atoms > {MAX_HEAVY_ATOMS}", persisted=True))
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
+
 # ------ END ------
 
 # ------ TEST ONLY: CURATOR PROFILE ------
