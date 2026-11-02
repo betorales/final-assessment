@@ -39,16 +39,173 @@ db = SQLAlchemy(app, metadata=MetaData(naming_convention={
 }))
 migrate = Migrate(app, db)
 
-# Heavy atoms var
+# Heavy atoms env var
 MAX_HEAVY_ATOMS = 200
 
-class Compound(db.Model):
+# ------ TABLES ------
+# CHECK constraints go in __table_args__ and need a name: Flask-Migrate skips
+# the ones written inside a column.
+
+# ------ 1. ROLE ------
+class Role(db.Model):
+    __tablename__ = "role"
+
     id = db.Column(db.Integer, Identity(always=True), primary_key=True)
-    canonical_smiles = db.Column(db.Text, nullable=False, unique=True)
+    name = db.Column(db.String(30), nullable=False, unique=True)
+# ------ END ROLE TABLE ------
+
+# ------ 2. APP USER ------
+class AppUser(db.Model):
+    __tablename__ = "app_user"  # "user" is a reserved word in PostgreSQL
+
+    id = db.Column(db.Integer, Identity(always=True), primary_key=True)
+    role_id = db.Column(db.Integer, db.ForeignKey("role.id"), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), nullable=False, unique=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    institution = db.Column(db.String(150))
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
+    is_active = db.Column(db.Boolean, nullable=False, server_default="true")
+    failed_attempts = db.Column(db.SmallInteger, nullable=False, server_default="0")  # consecutive failed sign-ins
+    locked_until = db.Column(db.DateTime(timezone=True))  # NULL: not locked
+# ------ END APP USER TABLE ------
+
+# ------ 3. FILTER PROFILE ------
+class FilterProfile(db.Model):
+    __tablename__ = "filter_profile"
+    __table_args__ = (
+        CheckConstraint("mw_max >= 0", name="mw_max_non_negative"),
+        CheckConstraint("hbd_max >= 0", name="hbd_max_non_negative"),
+        CheckConstraint("hba_max >= 0", name="hba_max_non_negative"),
+        CheckConstraint("tpsa_max >= 0", name="tpsa_max_non_negative"),
+        CheckConstraint("rotb_max >= 0", name="rotb_max_non_negative"),
+        CheckConstraint("allowed_violations >= 0", name="allowed_violations_non_negative"),
+        # Same rules as the form, so no other path can store an invalid profile.
+        CheckConstraint("logp_min < logp_max", name="logp_range"),
+        CheckConstraint("num_nonnulls(mw_max, logp_min, logp_max, hbd_max, hba_max, tpsa_max, rotb_max) > 0",
+                        name="at_least_one_threshold"),
+    )
+
+    id = db.Column(db.Integer, Identity(always=True), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("app_user.id"))  # NULL for the preloaded profiles
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    is_official = db.Column(db.Boolean, nullable=False, server_default="false")  # made by a curator, visible to everyone
+
+    # NULL threshold: the profile does not evaluate that descriptor.
+    mw_max = db.Column(db.Numeric(10, 2))
+    logp_min = db.Column(db.Numeric(6, 2))
+    logp_max = db.Column(db.Numeric(6, 2))
+    hbd_max = db.Column(db.SmallInteger)
+    hba_max = db.Column(db.SmallInteger)
+    tpsa_max = db.Column(db.Numeric(7, 2))
+    rotb_max = db.Column(db.SmallInteger)
+
+    allowed_violations = db.Column(db.SmallInteger, nullable=False, server_default="0")
+    apply_alerts = db.Column(db.Boolean, nullable=False, server_default="true")
+    is_active = db.Column(db.Boolean, nullable=False, server_default="true")  # hidden, not deleted: past screenings point to it
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
+# ------ END FILTER PROFILE TABLE ------
+
+# ------ 4. LIBRARY ------
+class Library(db.Model):
+    __tablename__ = "library"
+
+    id = db.Column(db.Integer, Identity(always=True), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("app_user.id"), nullable=False, index=True)
+    name = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text)
+    uploaded_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
+# ------ END LIBRARY TABLE ------
+
+# ------ 5. COMPOUND ------
+class Compound(db.Model):
+    __tablename__ = "compound"
+
+    id = db.Column(db.Integer, Identity(always=True), primary_key=True)
+    canonical_smiles = db.Column(db.Text, nullable=False, unique=True)  # deduplication key
     inchikey = db.Column(db.String(27), index=True)
-    heavy_atoms = db.Column(db.SmallInteger, nullable=False)
+    name = db.Column(db.String(200))
+
+    # Calculated with RDKit. NULL when the compound is out of scope.
+    molecular_weight = db.Column(db.Numeric(10, 2))
+    clogp = db.Column(db.Numeric(6, 2))
+    hbd = db.Column(db.SmallInteger)
+    hba = db.Column(db.SmallInteger)
+    tpsa = db.Column(db.Numeric(7, 2))
+    rotatable_bonds = db.Column(db.SmallInteger)
+    aromatic_rings = db.Column(db.SmallInteger)
+    heavy_atoms = db.Column(db.SmallInteger, nullable=False)  # always calculated: it decides out_of_scope
+    fraction_csp3 = db.Column(db.Numeric(4, 3))
+    qed = db.Column(db.Numeric(4, 3))
+
     out_of_scope = db.Column(db.Boolean, Computed(f"heavy_atoms > {MAX_HEAVY_ATOMS}", persisted=True))
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
+# ------ END COMPOUND TABLE ------
+
+# ------ 6. COMPOUND LIBRARY ------
+class CompoundLibrary(db.Model):
+    __tablename__ = "compound_library"
+
+    library_id = db.Column(db.Integer, db.ForeignKey("library.id", ondelete="CASCADE"), primary_key=True)
+    compound_id = db.Column(db.Integer, db.ForeignKey("compound.id"), primary_key=True)
+    external_code = db.Column(db.String(50))  # the compound's ID in the uploaded file (vendor code, ChEMBL ID…)
+# ------ END COMPOUND LIBRARY TABLE ------
+
+# ------ 7. STRUCTURAL ALERT ------
+class StructuralAlert(db.Model):
+    __tablename__ = "structural_alert"
+    __table_args__ = (
+        CheckConstraint("family IN ('PAINS_A', 'PAINS_B', 'PAINS_C', 'BRENK', 'REACTIVE')", name="valid_family"),
+        CheckConstraint("severity IN ('discard', 'warning')", name="valid_severity"),
+    )
+
+    id = db.Column(db.Integer, Identity(always=True), primary_key=True)
+    family = db.Column(db.String(20), nullable=False)
+    name = db.Column(db.String(150), nullable=False)
+    smarts = db.Column(db.Text, nullable=False)
+    severity = db.Column(db.String(10), nullable=False, server_default="warning")
+    description = db.Column(db.Text)
+    reference = db.Column(db.String(255))
+    is_active = db.Column(db.Boolean, nullable=False, server_default="true")
+# ------ END STRUCTURAL ALERT TABLE ------
+
+# ------ 8. COMPOUND ALERT ------
+class CompoundAlert(db.Model):
+    __tablename__ = "compound_alert"
+    __table_args__ = (
+        CheckConstraint("match_count > 0", name="match_count_positive"),
+    )
+
+    compound_id = db.Column(db.Integer, db.ForeignKey("compound.id", ondelete="CASCADE"), primary_key=True)
+    alert_id = db.Column(db.Integer, db.ForeignKey("structural_alert.id", ondelete="CASCADE"),
+                         primary_key=True, index=True)
+    match_count = db.Column(db.SmallInteger, nullable=False, server_default="1")
+# ------ END COMPOUND ALERT TABLE ------
+
+# ------ 9. SCREENING ------
+class Screening(db.Model):
+    __tablename__ = "screening"
+
+    id = db.Column(db.Integer, Identity(always=True), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("app_user.id"), nullable=False, index=True)
+    library_id = db.Column(db.Integer, db.ForeignKey("library.id", ondelete="CASCADE"), nullable=False)
+    filter_profile_id = db.Column(db.Integer, db.ForeignKey("filter_profile.id"), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
+    total_evaluated = db.Column(db.Integer, nullable=False, server_default="0")
+    total_passed = db.Column(db.Integer, nullable=False, server_default="0")
+# ------ END SCREENING TABLE ------
+
+# ------ 10. SCREENING RESULT ------
+class ScreeningResult(db.Model):
+    __tablename__ = "screening_result"
+
+    screening_id = db.Column(db.Integer, db.ForeignKey("screening.id", ondelete="CASCADE"), primary_key=True)
+    compound_id = db.Column(db.Integer, db.ForeignKey("compound.id"), primary_key=True)
+    passed = db.Column(db.Boolean, nullable=False)
+    violations = db.Column(db.SmallInteger, nullable=False, server_default="0")
+    reason = db.Column(db.Text)  # e.g. "MW 1202.63 > 500; HBA 12 > 10"
+# ------ END SCREENING RESULT TABLE -------
 
 # ------ END ------
 
