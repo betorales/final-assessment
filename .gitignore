@@ -59,10 +59,8 @@ results/
 *.fastq.gz
 *.bam
 
-# --- Images (uploaded to the host separately) ---
-static/ChemoTRIAGE.png
-static/favicon.svg
-static/logo-horizontal.svg
+# --- Images ---
+# Reminder: images are loaded to GH prior to deployment
 
 # --- SQL files ---
 *.sql

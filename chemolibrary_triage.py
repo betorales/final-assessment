@@ -25,7 +25,10 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-only-change-me")
 CSRFProtect(app)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "postgresql+psycopg:///chemotriage")
+db_url = os.environ.get("DATABASE_URL", "postgresql+psycopg:///chemotriage")
+# Providers give postgres:// or postgresql://; psycopg 3 needs the +psycopg driver name.
+db_url = db_url.replace("postgres://", "postgresql+psycopg://", 1).replace("postgresql://", "postgresql+psycopg://", 1)
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 # ------ END ------
 
 # ------ DB CONFIG ------
