@@ -18,7 +18,7 @@
             </a>
             {% block nav %}
             {% endblock %}
-            {# ------ Remember to change from <!--…--> to {#…#} comments in every page since people may see those comments ------ #}
+            {# ------ Remember to change from html comments to Jinja comments comments in every page since people may see those comments ------ #}
             
             {% if current_user.is_authenticated %}
             <a href="{{url_for('profile')}}" class="user-button">
