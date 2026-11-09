@@ -1,0 +1,25 @@
+{% extends 'auth.html' %}
+
+{% block title %}
+Create account
+{% endblock %}
+
+{% block form %}
+
+{% from "_macros.html" import form_field %}
+
+<h2 class="heading">Create account</h2>
+
+<form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ form_field(form.name, autocomplete="name") }}
+    {{ form_field(form.email, placeholder="you@institution.org", autocomplete="email") }}
+    {{ form_field(form.institution, autocomplete="organization") }}
+    {{ form_field(form.password, autocomplete="new-password", help_text="At least 8 characters, including a number.") }}
+    {{ form_field(form.confirm_password, autocomplete="new-password") }}
+    <button type="submit" class="button button--primary">Create account</button>
+</form>
+
+<p class="signup">Already have an account? <a href="{{ url_for('home') }}">Sign in</a></p>
+
+{% endblock %}

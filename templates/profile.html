@@ -46,9 +46,11 @@ Profile
       <div><dt>Screenings</dt><dd>{{ stats.screenings }}</dd></div>
       <div><dt>Own profiles</dt><dd>{{ stats.profiles }}</dd></div>
     </dl>
-
-    {# TODO (login): point to the sign-out route. #}
-    <a class="button button--block" href="{{ url_for('home') }}">Sign out</a>
+{# ------ Prior to this, sign out option was not working. Now it does ------ #}
+    <form method="post" action="{{ url_for('logout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="button button--block">Sign out</button>
+    </form>
   </aside>
 
 

@@ -1,12 +1,15 @@
 import contextlib
 import io
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from functools import wraps
 from pathlib import Path
 from types import SimpleNamespace
 
 # ----- FLASK APP ------
+import click
 from flask import Flask, abort, flash, redirect, render_template, request, url_for
+from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from flask_wtf import CSRFProtect, FlaskForm
 from flask_wtf.file import FileAllowed, FileField, FileRequired
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -16,7 +19,7 @@ from wtforms.validators import (DataRequired, EqualTo, InputRequired, Length, Nu
 # ----- DATABASE -----
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import CheckConstraint, Computed, Identity, MetaData, func
+from sqlalchemy import CheckConstraint, Computed, Identity, MetaData, func, select
 
 app = Flask(__name__)
 
@@ -42,6 +45,17 @@ db = SQLAlchemy(app, metadata=MetaData(naming_convention={
 }))
 migrate = Migrate(app, db)
 
+# ------ LOGIN CONFIG ------
+login_manager = LoginManager(app)
+# ------ Where @login_required sends visitors who are not signed in ------
+login_manager.login_view = "home"  
+login_manager.login_message = "Sign in to continue."
+login_manager.login_message_category = "info"
+
+MAX_FAILED_ATTEMPTS = 5
+LOCK_MINUTES = 15
+# ------ END ------
+
 # Heavy atoms env var
 MAX_HEAVY_ATOMS = 200
 
@@ -58,7 +72,7 @@ class Role(db.Model):
 # ------ END ROLE TABLE ------
 
 # ------ 2. APP USER ------
-class AppUser(db.Model):
+class AppUser(UserMixin, db.Model):
     __tablename__ = "app_user"  # "user" is a reserved word in PostgreSQL
 
     id = db.Column(db.Integer, Identity(always=True), primary_key=True)
@@ -71,6 +85,13 @@ class AppUser(db.Model):
     is_active = db.Column(db.Boolean, nullable=False, server_default="true")
     failed_attempts = db.Column(db.SmallInteger, nullable=False, server_default="0")  # consecutive failed sign-ins
     locked_until = db.Column(db.DateTime(timezone=True))  # NULL: not locked
+
+    # ------ The is_active column above replaces UserMixin's is_active, so Flask-Login refuses deactivated accounts. A relationship adds no column: no migration needed. ------
+    role = db.relationship("Role", lazy="joined")
+
+    @property
+    def initials(self):
+        return "".join(part[0] for part in self.name.split()[:2]).upper()
 # ------ END APP USER TABLE ------
 
 # ------ 3. FILTER PROFILE ------
@@ -212,17 +233,145 @@ class ScreeningResult(db.Model):
 
 # ------ END ------
 
-# ------ TEST ONLY: CURATOR PROFILE ------
-CURATOR_MODE = True
+# ------ AUTHENTICATION ------
+# Shared by the sign-up and change-password forms.
+PASSWORD_RULES = [
+    Length(min=8, message="Must be at least 8 characters long."),
+    Regexp(r".*\d", message="Must include at least one number."),
+]
+
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.get(AppUser, int(user_id))
 
 def is_curator():
-    return CURATOR_MODE
+    return current_user.is_authenticated and current_user.role.name == "curator"
 
 @app.context_processor
 def inject_role():
     return {"is_curator": is_curator()}
 
-# ----- END ------
+def curator_required(view):
+    @wraps(view)
+    @login_required
+    def wrapped(*args, **kwargs):
+        if not is_curator():
+            abort(403)
+        return view(*args, **kwargs)
+    return wrapped
+
+def safe_next():
+    # ------ @login_required needs to be checked to avoid wrong redirections ------
+    target = request.args.get("next", "")
+    if target.startswith("/") and not target.startswith("//") and "\\" not in target:
+        return target
+    return None
+
+def normalize_email(value):
+    return value.strip().lower() if value else value
+
+def empty_to_none(value):
+    # ------ A empty field is filled as NULL not as blank ------
+    return value.strip() or None if value else None
+
+class LoginForm(FlaskForm):
+    email = EmailField("Email", filters=[normalize_email], validators=[DataRequired()])
+    password = PasswordField("Password", validators=[DataRequired()])
+
+@app.route("/", methods=["GET", "POST"])
+def home():
+    if current_user.is_authenticated:
+        return redirect(url_for("libraries"))
+
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = db.session.scalar(select(AppUser).filter_by(email=form.email.data))
+        now = datetime.now(timezone.utc)
+
+        if user and user.locked_until and user.locked_until > now:
+            form.form_errors.append("Too many failed attempts. Try again in a few minutes.")
+        elif user and check_password_hash(user.password_hash, form.password.data):
+            if not user.is_active:
+                form.form_errors.append("This account is deactivated. Contact a curator.")
+            else:
+                user.failed_attempts = 0
+                user.locked_until = None
+                db.session.commit()
+                login_user(user)
+                return redirect(safe_next() or url_for("libraries"))
+        else:
+            # ------ Same message for an unknown email and a wrong password, so the form does not reveal which emails have an account. ------
+            if user:
+                user.failed_attempts += 1
+                if user.failed_attempts >= MAX_FAILED_ATTEMPTS:
+                    user.locked_until = now + timedelta(minutes=LOCK_MINUTES)
+                    user.failed_attempts = 0
+                db.session.commit()
+            form.form_errors.append("Incorrect email or password.")
+
+    return render_template("home.html", form=form)
+
+
+class RegisterForm(FlaskForm):
+    name = StringField("Name", validators=[DataRequired(), Length(max=100)])
+    email = EmailField("Email", filters=[normalize_email], validators=[
+        DataRequired(), Length(max=120),
+        Regexp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", message="Enter a valid email address."),
+    ])
+    institution = StringField("Institution", filters=[empty_to_none], validators=[Optional(), Length(max=150)])
+    password = PasswordField("Password", validators=[DataRequired(), *PASSWORD_RULES])
+    confirm_password = PasswordField("Confirm password", validators=[
+        DataRequired(), EqualTo("password", message="Passwords do not match."),
+    ])
+
+    # ------ WTForms runs validate_<field> methods automatically after the field's validators. ------
+    def validate_email(self, field):
+        if db.session.scalar(select(AppUser.id).filter_by(email=field.data)):
+            raise ValidationError("This email is already registered.")
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for("libraries"))
+
+    form = RegisterForm()
+    if form.validate_on_submit():
+        # ------ Sign-up always creates researchers; curators are promoted with flask --app chemolibrary_triage make-curator EMAIL ------
+        user = AppUser(
+            name=form.name.data,
+            email=form.email.data,
+            institution=form.institution.data,
+            password_hash=generate_password_hash(form.password.data),
+            role=db.session.scalar(select(Role).filter_by(name="researcher")),
+        )
+        db.session.add(user)
+        db.session.commit()
+        login_user(user)
+        flash("Welcome to ChemoTRIAGE.", "success")
+        return redirect(url_for("libraries"))
+
+    return render_template("register.html", form=form)
+
+# ------ POST since any page using a link like https://.../logout will log out any account ------
+@app.route("/logout", methods=["POST"])
+@login_required
+def logout():
+    logout_user()
+    flash("You signed out.", "success")
+    return redirect(url_for("home"))
+
+
+@app.cli.command("make-curator")
+@click.argument("email")
+def make_curator(email):
+    # ------ Give the curator role to an existing account ------
+    user = db.session.scalar(select(AppUser).filter_by(email=normalize_email(email)))
+    if user is None:
+        raise click.ClickException(f"No account uses {email}. Sign up on the site first.")
+    user.role = db.session.scalar(select(Role).filter_by(name="curator"))
+    db.session.commit()
+    click.echo(f"{user.email} is now a curator.")
+# ------ END AUTHENTICATION ------
 
 class LibraryForm(FlaskForm):
     name = StringField("Name", validators=[DataRequired(), Length(max=150)])
@@ -233,9 +382,6 @@ class FilterProfileForm(FlaskForm):
     name = StringField("Name", validators=[DataRequired(), Length(max=100)])
     description = TextAreaField("Description", validators=[Optional()])
 
-    # Optional(): an empty field arrives as None and is stored as NULL, which in
-    # the data model means "this profile does not evaluate the descriptor".
-    # places=None shows "400" instead of "400.00".
     mw_max = DecimalField("Max MW (Da)", places=None,
                           validators=[Optional(), NumberRange(min=0, message="Cannot be negative.")])
     logp_min = DecimalField("Min LogP", places=None, validators=[Optional()])
@@ -249,7 +395,6 @@ class FilterProfileForm(FlaskForm):
     rotb_max = IntegerField("Max RotB",
                             validators=[Optional(), NumberRange(min=0, message="Cannot be negative.")])
 
-    # InputRequired, not DataRequired: DataRequired rejects 0, which is valid here.
     allowed_violations = IntegerField("Allowed violations", default=0,
                                       validators=[InputRequired(),
                                                   NumberRange(min=0, message="Cannot be negative.")])
@@ -295,58 +440,53 @@ OFFICIAL_PROFILES = [
          allowed_violations=0, apply_alerts=True),
 ]
 
-@app.route("/")
-def home():
-    return render_template('home.html')
-
 # ------ PROFILE ------
 
 @app.route("/profile", methods=['GET', 'POST'])
+@login_required
 def profile():
-    account_form = AccountForm(obj=SimpleNamespace(**DEMO_USER))
+    account_form = AccountForm(obj=current_user)
     if account_form.validate_on_submit():
-        # TODO (database): check the email is not used by another account (it is
-        # UNIQUE), then account_form.populate_obj(user) and save.
-        flash("Details updated.", "success")
-        return redirect(url_for('profile'))
+        taken = db.session.scalar(select(AppUser.id).where(
+            AppUser.email == account_form.email.data, AppUser.id != current_user.id))
+        if taken:
+            account_form.email.errors.append("Another account already uses this email.")
+        else:
+            account_form.populate_obj(current_user)
+            db.session.commit()
+            flash("Details updated.", "success")
+            return redirect(url_for('profile'))
     return render_template('profile.html', **profile_context(account_form=account_form))
 
 
 @app.route('/profile/password', methods=['POST'])
+@login_required
 def change_password():
-    user = SimpleNamespace(**DEMO_USER)
     password_form = PasswordForm()
     if password_form.validate_on_submit():
-        if not check_password_hash(user.password_hash, password_form.current_password.data):
+        if not check_password_hash(current_user.password_hash, password_form.current_password.data):
             password_form.current_password.errors.append("Current password is incorrect.")
         else:
-            # TODO (database): user.password_hash = generate_password_hash(password_form.new_password.data)
+            current_user.password_hash = generate_password_hash(password_form.new_password.data)
+            db.session.commit()
             flash("Password updated.", "success")
             return redirect(url_for('profile'))
     return render_template('profile.html', **profile_context(password_form=password_form))
 
-# User management, curator only. Redirects to the account page until it is built.
+# ------ User management, curator only. Redirects to the account page until it is built. ------
 @app.route('/users')
+@curator_required
 def users():
-    if not is_curator():
-        abort(403)
     return redirect(url_for('profile'))
 
 class AccountForm(FlaskForm):
     name = StringField("Name", validators=[DataRequired(), Length(max=100)])
     # A regex is enough to check the format; WTForms' Email() needs an extra package.
-    email = EmailField("Email", validators=[
+    email = EmailField("Email", filters=[normalize_email], validators=[
         DataRequired(), Length(max=120),
         Regexp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", message="Enter a valid email address."),
     ])
-    institution = StringField("Institution", validators=[Optional(), Length(max=150)])
-
-
-# Shared with the sign-up form.
-PASSWORD_RULES = [
-    Length(min=8, message="Must be at least 8 characters long."),
-    Regexp(r".*\d", message="Must include at least one number."),
-]
+    institution = StringField("Institution", filters=[empty_to_none], validators=[Optional(), Length(max=150)])
 
 
 class PasswordForm(FlaskForm):
@@ -363,15 +503,8 @@ class PasswordForm(FlaskForm):
             valid = False
         return valid
 
-DEMO_USER = dict(
-    id=1,
-    name="Demo User",
-    email="demo@example.org",
-    institution="Example University",
-    created_at=datetime(2026, 10, 1),
-    password_hash=generate_password_hash("demo1234"),
-)
-
+def count_own(model):
+    return db.session.scalar(select(func.count()).select_from(model).where(model.user_id == current_user.id))
 
 def profile_context(account_form=None, password_form=None):
     """Builds what profile.html needs; used by both profile routes.
@@ -379,13 +512,13 @@ def profile_context(account_form=None, password_form=None):
     The form that was not submitted gets formdata=None, so it does not read the
     other form's POST data.
     """
-    user = SimpleNamespace(**DEMO_USER)
     return dict(
-        user=user,
-        initials="".join(part[0] for part in user.name.split()[:2]).upper(),
-        role="Curator" if is_curator() else "Researcher",
-        stats=dict(libraries=1, screenings=1, profiles=0),  # TODO (database): COUNT queries
-        account_form=account_form if account_form is not None else AccountForm(formdata=None, obj=user),
+        user=current_user,
+        initials=current_user.initials,
+        role=current_user.role.name.capitalize(),
+        stats=dict(libraries=count_own(Library), screenings=count_own(Screening),
+                   profiles=count_own(FilterProfile)),
+        account_form=account_form if account_form is not None else AccountForm(formdata=None, obj=current_user),
         password_form=password_form if password_form is not None else PasswordForm(formdata=None),
     )
 
@@ -394,6 +527,7 @@ def profile_context(account_form=None, password_form=None):
 # ------ SCREENINGS ------
 
 @app.route('/screenings', methods=['GET', 'POST'])
+@login_required
 def screenings():
     available_libraries = [SimpleNamespace(id=1, name="Demo — reference drugs")]
     profiles = [SimpleNamespace(**p) for p in OFFICIAL_PROFILES]
@@ -430,6 +564,7 @@ class ScreeningForm(FlaskForm):
     filter_profile = SelectField("Filter profile", coerce=int_or_none, validators=[DataRequired()])
 
 @app.route('/screenings/<int:id>')
+@login_required
 def see_screening(id):
     return redirect(url_for('screenings'))
 
@@ -440,20 +575,24 @@ def see_screening(id):
 # ------ LIBRARIES ------
 
 @app.route('/libraries')
+@login_required
 def libraries():
     demo = SimpleNamespace(id=1, name="Demo — reference drugs", uploaded_at=datetime(2026, 10, 18), compound_count=12)
     pagination = SimpleNamespace(items=[demo], total=1, pages=1, page=1)
     return render_template('libraries.html', pagination=pagination, q=None, form=LibraryForm(), summary=None)
 
 @app.route('/libraries/upload', methods=['POST'])
+@login_required
 def upload_libraries():
     return redirect(url_for('libraries'))
 
 @app.route('/libraries/<int:id>')
+@login_required
 def see_library(id):
     return redirect(url_for('libraries'))
 
 @app.route('/libraries/<int:id>/delete', methods=['POST'])
+@login_required
 def delete_library(id):
     return redirect(url_for('libraries'))
 
@@ -463,6 +602,7 @@ def delete_library(id):
 # ------ FILTER SETTINGS ------
 
 @app.route('/filter-settings', methods=['GET', 'POST'])
+@login_required
 def filter_settings():
     official = [SimpleNamespace(is_official=True, description=None, **p) for p in OFFICIAL_PROFILES]
     own = []  # TODO (database): the current user's profiles
@@ -497,10 +637,8 @@ def filter_settings():
 # ------ ALERTS ------
 
 @app.route('/alerts', methods=['GET', 'POST'])
+@curator_required
 def alerts():
-    if not is_curator():
-        abort(403)
-
     form = AlertForm()
     preview = None
 
@@ -535,9 +673,8 @@ def alerts():
                            family=family, q=q, form=form, preview=preview)
 
 @app.route('/alerts/<int:id>/toggle', methods=['POST'])
+@curator_required
 def toggle_alert(id):
-    if not is_curator():
-        abort(403)
     # TODO (database): flip alert.active and save.
     return redirect(url_for('alerts'))
 

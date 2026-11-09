@@ -18,7 +18,17 @@
             </a>
             {% block nav %}
             {% endblock %}
-            <a href="/profile" class="user-button">Profile ▾</a>
+            {# ------ Remember to change from <!--…--> to {#…#} comments in every page since people may see those comments ------ #}
+            
+            {% if current_user.is_authenticated %}
+            <a href="{{url_for('profile')}}" class="user-button">
+                <span class="avatar" aria-hidden="true">{{ current_user.initials }}</span>
+                <span class="identity">
+                    <span>{{ current_user.name }}</span>
+                    <span class="role">{{ current_user.role.name|capitalize }}</span>
+                </span>
+            </a>
+            {% endif %}
         </div>
     </header>
     <main id="content" class="container content">
