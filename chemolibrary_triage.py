@@ -584,8 +584,18 @@ def libraries():
 @app.route('/libraries/upload', methods=['POST'])
 @login_required
 def upload_libraries():
-    return redirect(url_for('libraries'))
-
+    form = LibraryForm()
+    if form.validate_on_submit():
+        uploaded_file = form.file.data
+        # ------ Some files require another utf-8, like Windows devices ------
+        text = uploaded_file.read().decode("utf-8-sig")
+        compounds = read_smi(text)
+        return redirect(url_for('libraries'))
+    else:
+        demo = SimpleNamespace(id=1, name="Demo — reference drugs", uploaded_at=datetime(2026, 10, 18), compound_count=12)
+        pagination = SimpleNamespace(items=[demo], total=1, pages=1, page=1)
+        return render_template('libraries.html', pagination=pagination, q=None, form=form, summary=None)
+    
 @app.route('/libraries/<int:id>')
 @login_required
 def see_library(id):
@@ -727,15 +737,18 @@ DEMO_ALERTS = [
 
 DEMO_SMI_PATH = Path(app.root_path) / "data" / "demo_compounds.smi"
 
-
-def read_smi(path):
-    """Reads a .smi file: one SMILES per line, optionally followed by a name.
+def read_smi(text):
+    """Reads text from .smi: one SMILES per line, optionally followed by a name.
     Blank lines and lines starting with # are skipped."""
     compounds = []
-    for line in Path(path).read_text(encoding="utf-8").splitlines():
+    for number, line in enumerate(text.splitlines(), start = 1):
+        # ------ Line numbers include blank lines and comments, so they match the user's editor ------
+        line = line.strip()
+        if not line:
+            continue
         parts = line.split(maxsplit=1)
         if parts and not parts[0].startswith("#"):
-            compounds.append((parts[0], parts[1] if len(parts) > 1 else parts[0]))
+            compounds.append((number, parts[0], parts[1] if len(parts) > 1 else None))
     return compounds
 
 
@@ -744,14 +757,13 @@ def preview_pattern(smarts):
     from rdkit import Chem
 
     pattern = Chem.MolFromSmarts(smarts)
-    compounds = read_smi(DEMO_SMI_PATH)
+    compounds = read_smi(DEMO_SMI_PATH.read_text(encoding="utf-8"))
     matches = []
-    for smiles, name in compounds:
+    for _, smiles, name in compounds:
         mol = Chem.MolFromSmiles(smiles)
         if mol is not None and mol.HasSubstructMatch(pattern):
             matches.append(name)
     return {"matches": matches, "total": len(compounds)}
-
 # ------ END ALERTS -------
 
 if __name__ == "__main__":
