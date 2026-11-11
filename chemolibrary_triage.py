@@ -592,6 +592,13 @@ def upload_libraries():
         compounds = read_smi(text)
         valid, rejections = validate_compounds(compounds)
         unique, duplicates = deduplicate(valid)
+        described = []
+        out_of_scope = 0
+        for  number, canonical, name, mol in unique:
+            descriptors = describe(mol)
+            if descriptors["heavy_atoms"] > MAX_HEAVY_ATOMS:
+                out_of_scope += 1
+            described.append((number, canonical, name, descriptors))
         return redirect(url_for('libraries'))
     else:
         demo = SimpleNamespace(id=1, name="Demo — reference drugs", uploaded_at=datetime(2026, 10, 18), compound_count=12)
@@ -793,7 +800,27 @@ def read_smi(text):
             compounds.append((number, parts[0], parts[1] if len(parts) > 1 else None))
     return compounds
 
+# ------ Returns: column name → value, ready for Compound(**descriptors) ------
+def describe(mol):
+    from rdkit import Chem
+    from rdkit.Chem import Descriptors, QED
+    descriptors = {}
+    mol_heavy_atoms = mol.GetNumHeavyAtoms()
+    descriptors["heavy_atoms"]= mol_heavy_atoms
 
+    if mol_heavy_atoms <= MAX_HEAVY_ATOMS:
+        descriptors["inchikey"]=Chem.MolToInchiKey(mol)
+        descriptors["molecular_weight"]=Descriptors.MolWt(mol)
+        descriptors["clogp"]=Descriptors.MolLogP(mol)
+        descriptors["hbd"]=Descriptors.NumHDonors(mol) 
+        descriptors["hba"]=Descriptors.NumHAcceptors(mol)
+        descriptors["tpsa"]=Descriptors.TPSA(mol)
+        descriptors["rotatable_bonds"]=Descriptors.NumRotatableBonds(mol)
+        descriptors["aromatic_rings"]=Descriptors.NumAromaticRings(mol)
+        descriptors["fraction_csp3"]=Descriptors.FractionCSP3(mol)
+        descriptors["qed"]=QED.qed(mol)
+    return descriptors
+    
 def preview_pattern(smarts):
     """Matches the pattern against the loaded compounds without saving anything."""
     from rdkit import Chem
