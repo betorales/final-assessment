@@ -590,12 +590,15 @@ def upload_libraries():
         # ------ Some files require another utf-8, like Windows devices ------
         text = uploaded_file.read().decode("utf-8-sig")
         compounds = read_smi(text)
+        # ------ Part of Task 2 ------
+        valid, rejections = validate_compounds(compounds)
+        # ------ END ------
         return redirect(url_for('libraries'))
     else:
         demo = SimpleNamespace(id=1, name="Demo — reference drugs", uploaded_at=datetime(2026, 10, 18), compound_count=12)
         pagination = SimpleNamespace(items=[demo], total=1, pages=1, page=1)
         return render_template('libraries.html', pagination=pagination, q=None, form=form, summary=None)
-    
+
 @app.route('/libraries/<int:id>')
 @login_required
 def see_library(id):
@@ -736,6 +739,29 @@ DEMO_ALERTS = [
 ]
 
 DEMO_SMI_PATH = Path(app.root_path) / "data" / "demo_compounds.smi"
+
+# ------ Other functions ------
+def validate_compounds(compounds):
+    # ------ Extract valid and rejected SMILES ------
+    # ------ Task 2: Validating every line ------
+    from rdkit import Chem, rdBase
+    rdBase.LogToPythonStderr()
+    valid = []
+    rejections = []
+    for number, smiles, name in compounds:
+        # ------ Task 2.1: Cleaning the output ------
+        output = io.StringIO()
+        with contextlib.redirect_stderr(output):
+            mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            # ------ Read Stderr so error can be appended ans shown to user ------
+            lines = output.getvalue().strip().splitlines()
+            # ------ Remove Parse Error to provide clearer info ------ 
+            reason = lines[0].split("]", 1)[-1].strip().removeprefix("SMILES Parse Error: ") if lines else "Invalid SMILES"
+            rejections.append({"line": number, "reason": reason})
+        else:
+            valid.append((number, smiles, name, mol))
+    return valid, rejections
 
 def read_smi(text):
     """Reads text from .smi: one SMILES per line, optionally followed by a name.
