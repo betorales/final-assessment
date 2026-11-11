@@ -590,9 +590,8 @@ def upload_libraries():
         # ------ Some files require another utf-8, like Windows devices ------
         text = uploaded_file.read().decode("utf-8-sig")
         compounds = read_smi(text)
-        # ------ Part of Task 2 ------
         valid, rejections = validate_compounds(compounds)
-        # ------ END ------
+        unique, duplicates = deduplicate(valid)
         return redirect(url_for('libraries'))
     else:
         demo = SimpleNamespace(id=1, name="Demo — reference drugs", uploaded_at=datetime(2026, 10, 18), compound_count=12)
@@ -743,13 +742,13 @@ DEMO_SMI_PATH = Path(app.root_path) / "data" / "demo_compounds.smi"
 # ------ Other functions ------
 def validate_compounds(compounds):
     # ------ Extract valid and rejected SMILES ------
-    # ------ Task 2: Validating every line ------
+    
     from rdkit import Chem, rdBase
     rdBase.LogToPythonStderr()
     valid = []
     rejections = []
     for number, smiles, name in compounds:
-        # ------ Task 2.1: Cleaning the output ------
+        
         output = io.StringIO()
         with contextlib.redirect_stderr(output):
             mol = Chem.MolFromSmiles(smiles)
@@ -762,6 +761,23 @@ def validate_compounds(compounds):
         else:
             valid.append((number, smiles, name, mol))
     return valid, rejections
+
+def deduplicate(valid):
+    from rdkit import Chem
+    # ------ Uniques and/or first SMILES usage ------
+    unique = []
+    # ------ SMILES already uploaded ------
+    duplicates = []
+    # ------ SMILES already exists in this file ------
+    seen = {}
+    for number, smiles, name, mol in valid:
+        canonical = Chem.MolToSmiles(mol)
+        if canonical in seen:
+            duplicates.append({"line": number, "reason":f"Duplicate of line: {seen[canonical]}"})
+        else:
+            unique.append((number, canonical, name, mol))
+            seen[canonical] = number
+    return unique, duplicates
 
 def read_smi(text):
     """Reads text from .smi: one SMILES per line, optionally followed by a name.
