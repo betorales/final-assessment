@@ -599,6 +599,33 @@ def upload_libraries():
             if descriptors["heavy_atoms"] > MAX_HEAVY_ATOMS:
                 out_of_scope += 1
             described.append((number, canonical, name, descriptors))
+        # ------ Create a library ------
+        library = Library(
+            user_id=current_user.id,
+            name=form.name.data,
+            description=form.description.data
+        )
+        db.session.add(library)
+        db.session.flush()
+        # ------ Search for or create a compound ------
+        for number, canonical, name, descriptors in described:
+            compound = db.session.scalar(select(Compound).filter_by(canonical_smiles=canonical))
+            if compound is None:
+                compound = Compound(
+                    canonical_smiles=canonical, 
+                    name=name, 
+                    **descriptors
+                )
+                db.session.add(compound)
+                db.session.flush()
+            # ------ Link to library. Several libraries, not several compounds  ------
+            compound_library = CompoundLibrary(
+                library_id=library.id,
+                compound_id=compound.id,
+                external_code=name
+            )
+            db.session.add(compound_library)
+        db.session.commit()
         return redirect(url_for('libraries'))
     else:
         demo = SimpleNamespace(id=1, name="Demo — reference drugs", uploaded_at=datetime(2026, 10, 18), compound_count=12)
@@ -820,7 +847,7 @@ def describe(mol):
         descriptors["fraction_csp3"]=Descriptors.FractionCSP3(mol)
         descriptors["qed"]=QED.qed(mol)
     return descriptors
-    
+
 def preview_pattern(smarts):
     """Matches the pattern against the loaded compounds without saving anything."""
     from rdkit import Chem
