@@ -36,6 +36,8 @@ env/
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+# --- SMI files. Testing only ---
+/*.smi
 
 # --- Flask and local databases ---
 instance/

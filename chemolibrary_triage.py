@@ -626,6 +626,8 @@ def upload_libraries():
             )
             db.session.add(compound_library)
         db.session.commit()
+        # ------ Creating a summary ------
+        summary = {"name":library.name, "loaded":len(described), "duplicates":len(duplicates), "invalid":len(rejections), "out_of_scope":out_of_scope, "rejections":duplicates + rejections}
         return redirect(url_for('libraries'))
     else:
         demo = SimpleNamespace(id=1, name="Demo — reference drugs", uploaded_at=datetime(2026, 10, 18), compound_count=12)
@@ -740,7 +742,6 @@ def valid_smarts(form, field):
         lines = output.getvalue().strip().splitlines()
         detail = lines[0].split("Parse Error:", 1)[-1].strip() if lines else ""
         raise ValidationError("Invalid SMARTS pattern." + (f" RDKit says: {detail}" if detail else ""))
-
 
 class AlertForm(FlaskForm):
     family = SelectField("Family", default="REACTIVE", choices=[
