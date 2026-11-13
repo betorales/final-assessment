@@ -579,13 +579,16 @@ def see_screening(id):
 @app.route('/libraries')
 @login_required
 def libraries():
-    # ------  Demo is not shown anymore ------
-    # ------ Show user's libraries ------
+    # ------ Show user's libraries and find matching libraries name ------
     query = select(Library).filter_by(user_id=current_user.id).order_by(Library.uploaded_at.desc())
+    q = request.args.get("q","").strip()
+    # ------ Filter ONLY if there is something to filter ------
+    if q:
+        query = query.where(Library.name.ilike(f"%{q}%"))
     pagination = db.paginate(query, per_page=10)
     # ------ Keeping summary in screen ------
     summary = session.pop("upload_summary", None)
-    return render_template('libraries.html', pagination=pagination, q=None, form=LibraryForm(), summary=summary)
+    return render_template('libraries.html', pagination=pagination, q=q, form=LibraryForm(), summary=summary)
 
 @app.route('/libraries/upload', methods=['POST'])
 @login_required
