@@ -1543,14 +1543,6 @@ a.chip[aria-current="true"]:hover {
   padding: var(--space-5) var(--space-4);
 }
 
-.home-container > .img {
-  flex: 0 0 auto;
-  min-height: 160px;
-  background: var(--surface-selected) url("../static/ChemoTRIAGE.png") center / contain no-repeat;
-  border: var(--bw-hairline) solid var(--border-hairline);
-  border-radius: var(--radius-lg);
-}
-
 .home-container > .form {
   flex: 1 1 auto;
   display: flex;
@@ -1599,13 +1591,24 @@ a.chip[aria-current="true"]:hover {
 }
 
 @media (min-width: 890px) {
+  .content:has(> .home-container) {
+    flex: 1 0 auto;
+    justify-content: center;
+    align-items: center;
+    padding-block: 0;
+  }
   .home-container {
     flex-direction: row;
     align-items: stretch;
     gap: var(--space-8);
     padding: var(--space-8);
   }
-  .home-container > .img  { flex: 6 1 0; min-height: 0; }
+  .home-container > .img  { 
+    flex: 6 1 0; min-height: 0; 
+    background: var(--surface-selected) url("../static/ChemoTRIAGE.png") center / contain no-repeat;
+    border: var(--bw-hairline) solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+  }
   .home-container > .form { flex: 4 1 0; max-width: 460px; }
 }
 
