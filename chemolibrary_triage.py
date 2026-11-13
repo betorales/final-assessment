@@ -140,6 +140,10 @@ class Library(db.Model):
     name = db.Column(db.String(150), nullable=False)
     description = db.Column(db.Text)
     uploaded_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
+    # ------ Show user's libraries: counting compounds ------
+    @property
+    def compound_count(self):
+        return db.session.scalar(select(func.count()).select_from(CompoundLibrary).where(CompoundLibrary.library_id==self.id))
 # ------ END LIBRARY TABLE ------
 
 # ------ 5. COMPOUND ------
@@ -575,8 +579,10 @@ def see_screening(id):
 @app.route('/libraries')
 @login_required
 def libraries():
-    demo = SimpleNamespace(id=1, name="Demo — reference drugs", uploaded_at=datetime(2026, 10, 18), compound_count=12)
-    pagination = SimpleNamespace(items=[demo], total=1, pages=1, page=1)
+    # ------  Demo is not shown anymore ------
+    # ------ Show user's libraries ------
+    query = select(Library).filter_by(user_id=current_user.id).order_by(Library.uploaded_at.desc())
+    pagination = db.paginate(query, per_page=10)
     # ------ Keeping summary in screen ------
     summary = session.pop("upload_summary", None)
     return render_template('libraries.html', pagination=pagination, q=None, form=LibraryForm(), summary=summary)
