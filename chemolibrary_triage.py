@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 # ----- FLASK APP ------
 import click
-from flask import Flask, abort, flash, redirect, render_template, request, url_for
+from flask import Flask, abort, flash, redirect, render_template, request, url_for, session
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from flask_wtf import CSRFProtect, FlaskForm
 from flask_wtf.file import FileAllowed, FileField, FileRequired
@@ -570,8 +570,6 @@ def see_screening(id):
 
 # ------ END SCREENINGS ------
 
-
-
 # ------ LIBRARIES ------
 
 @app.route('/libraries')
@@ -579,7 +577,9 @@ def see_screening(id):
 def libraries():
     demo = SimpleNamespace(id=1, name="Demo — reference drugs", uploaded_at=datetime(2026, 10, 18), compound_count=12)
     pagination = SimpleNamespace(items=[demo], total=1, pages=1, page=1)
-    return render_template('libraries.html', pagination=pagination, q=None, form=LibraryForm(), summary=None)
+    # ------ Keeping summary in screen ------
+    summary = session.pop("upload_summary", None)
+    return render_template('libraries.html', pagination=pagination, q=None, form=LibraryForm(), summary=summary)
 
 @app.route('/libraries/upload', methods=['POST'])
 @login_required
@@ -628,6 +628,10 @@ def upload_libraries():
         db.session.commit()
         # ------ Creating a summary ------
         summary = {"name":library.name, "loaded":len(described), "duplicates":len(duplicates), "invalid":len(rejections), "out_of_scope":out_of_scope, "rejections":duplicates + rejections}
+        # ------ Keeping summary in screen ------
+        session["upload_summary"] = summary
+        # ------ Only 10 issues are shown, since a 4 KB cookie (session), so they will be saved ------
+        rejections[:10]
         return redirect(url_for('libraries'))
     else:
         demo = SimpleNamespace(id=1, name="Demo — reference drugs", uploaded_at=datetime(2026, 10, 18), compound_count=12)
@@ -792,7 +796,7 @@ def validate_compounds(compounds):
             lines = output.getvalue().strip().splitlines()
             # ------ Remove Parse Error to provide clearer info ------ 
             reason = lines[0].split("]", 1)[-1].strip().removeprefix("SMILES Parse Error: ") if lines else "Invalid SMILES"
-            rejections.append({"line": number, "reason": reason})
+            rejections.append({"line": number, "reason": f"Invalid SMILES: {reason}"})
         else:
             valid.append((number, smiles, name, mol))
     return valid, rejections
@@ -808,7 +812,7 @@ def deduplicate(valid):
     for number, smiles, name, mol in valid:
         canonical = Chem.MolToSmiles(mol)
         if canonical in seen:
-            duplicates.append({"line": number, "reason":f"Duplicate of line: {seen[canonical]}"})
+            duplicates.append({"line": number, "reason":f"Duplicate of line {seen[canonical]}"})
         else:
             unique.append((number, canonical, name, mol))
             seen[canonical] = number

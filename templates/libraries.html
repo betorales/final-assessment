@@ -41,7 +41,8 @@ Libraries
     {% endfor %}
   </ul>
   {% if summary.rejections|length > 10 %}
-  <p class="caption">And {{ summary.rejections|length - 10 }} more lines with problems.</p>
+  {# Update this line because sessing was added to keep and prevent summary is gone. summary.rejections|length - 10 -> actual code (below) #}
+  <p class="caption">And {{ summary.invalid + summary.duplicates }} more lines with problems.</p>
   {% endif %}
   {% endif %}
 </section>
