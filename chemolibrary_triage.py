@@ -444,6 +444,24 @@ OFFICIAL_PROFILES = [
          allowed_violations=0, apply_alerts=True),
 ]
 
+# ------ Upload official profiles as table ------
+@app.cli.command("seed-profiles")
+def seed_profiles():
+    profiles_created = 0
+    for profile in OFFICIAL_PROFILES:
+        data = dict(profile)
+        del data["id"]
+        existing = db.session.scalar(select(FilterProfile).filter_by(name=data["name"], is_official=True))
+        if existing is None:
+            profiles_created += 1
+            filter_profile=FilterProfile(
+                is_official=True,
+                **data
+        )
+            db.session.add(filter_profile)  
+    click.echo(f"Created {profiles_created} official profiles")
+    db.session.commit()
+
 # ------ PROFILE ------
 
 @app.route("/profile", methods=['GET', 'POST'])
