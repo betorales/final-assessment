@@ -683,9 +683,9 @@ def delete_library(id):
 @app.route('/filter-settings', methods=['GET', 'POST'])
 @login_required
 def filter_settings():
-    official = [SimpleNamespace(is_official=True, description=None, **p) for p in OFFICIAL_PROFILES]
-    own = []  # TODO (database): the current user's profiles
-
+    # ------ Query to FilterProfile filtering is_official and is_active, showing Offcial profiles from DB ------
+    official = db.session.scalars(select(FilterProfile).filter_by(is_official=True, is_active=True).order_by(FilterProfile.name)).all()
+    own = db.session.scalars(select(FilterProfile).filter_by(user_id=current_user.id, is_official=False, is_active=True).order_by(FilterProfile.name)).all()
     profile_id = request.args.get('profile', type=int)
     selected = next((p for p in official + own if p.id == profile_id), None)
 
