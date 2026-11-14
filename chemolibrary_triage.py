@@ -702,8 +702,24 @@ def filter_settings():
     if form.validate_on_submit():
         if not is_curator():
             form.is_official.data = False  # hiding the checkbox is not enough
-        # TODO (database): create or update the profile with form.populate_obj() and save.
-        return redirect(url_for('filter_settings'))
+
+        if editing:
+            # ------ Not selected, since user might own ones or uses officials ------
+            profile = editing
+        else:
+            # ------ Create a personal profile for a user ------
+            profile = FilterProfile(
+                user_id=current_user.id
+            )
+        form.populate_obj(profile)
+        db.session.add(profile)
+        # ------ Prevents ownership of a official profile (current user) ------
+        if profile.user_id is None and not profile.is_official:
+            profile.user_id=current_user.id
+        db.session.commit()
+        flash("Profile saved", "success")
+
+        return redirect(url_for('filter_settings', profile=profile.id))
 
     return render_template('filter-settings.html',
                            official_profiles=official, own_profiles=own, form=form,
