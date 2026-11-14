@@ -903,6 +903,33 @@ def describe(mol):
         descriptors["qed"]=QED.qed(mol)
     return descriptors
 
+# ------ To evaluate compounds vs profile ------
+def evaluate(compound, profile):
+    reasons = []
+    if compound.out_of_scope:
+        return False, 0, f"Out of scope: {compound.heavy_atoms} heavy atoms > {MAX_HEAVY_ATOMS}."
+    if profile.mw_max is not None and compound.molecular_weight > profile.mw_max:
+        reasons.append(f"MW: {compound.molecular_weight} > {profile.mw_max}")
+    if profile.logp_min is not None and compound.clogp < profile.logp_min:
+        reasons.append(f"LogP: {compound.clogp} < {profile.logp_min}")
+    if profile.logp_max is not None and compound.clogp > profile.logp_max:
+        reasons.append(f"LogP: {compound.clogp} > {profile.logp_max}")
+    if profile.hbd_max is not None and compound.hbd > profile.hbd_max:
+        reasons.append(f"HBD: {compound.hbd} > {profile.hbd_max}")
+    if profile.hba_max is not None and compound.hba > profile.hba_max:
+        reasons.append(f"HBA: {compound.hba} > {profile.hba_max}")
+    if profile.tpsa_max is not None and compound.tpsa > profile.tpsa_max:
+        reasons.append(f"TPSA: {compound.tpsa} > {profile.tpsa_max}")
+    if profile.rotb_max is not None and compound.rotatable_bonds > profile.rotb_max:
+        reasons.append(f"Rotatable bonds: {compound.rotatable_bonds} > {profile.rotb_max}")
+    violations = len(reasons)
+    passed = violations <= profile.allowed_violations
+    if reasons:
+        reason = "; ".join(reasons)
+    else:
+        reason = None
+    return passed, violations, reason
+
 def preview_pattern(smarts):
     """Matches the pattern against the loaded compounds without saving anything."""
     from rdkit import Chem
