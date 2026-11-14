@@ -551,8 +551,9 @@ def profile_context(account_form=None, password_form=None):
 @app.route('/screenings', methods=['GET', 'POST'])
 @login_required
 def screenings():
-    available_libraries = [SimpleNamespace(id=1, name="Demo — reference drugs")]
-    profiles = [SimpleNamespace(**p) for p in OFFICIAL_PROFILES]
+    # ------ Adding options to library dropdown in Screenings view ------
+    available_libraries = db.session.scalars(select(Library).filter_by(user_id=current_user.id).order_by(Library.name)).all()
+    official, own = visible_profiles()
     demo = SimpleNamespace(id=1, library="Demo — reference drugs",
                            profile="Lipinski + Veber", created_at=datetime(2026, 10, 18, 16, 40),
                            total_evaluated=12, total_passed=7)
@@ -561,7 +562,9 @@ def screenings():
 
     form = ScreeningForm()
     form.library.choices = [("", "Choose a library")] + [(b.id, b.name) for b in available_libraries]
-    form.filter_profile.choices = [("", "Choose a profile")] + [(p.id, f"{p.name} (official)") for p in profiles]
+    official_profiles = [(p.id, f"{p.name} (Official profile)") for p in official]
+    own_profiles = [(p.id, p.name) for p in own]
+    form.filter_profile.choices = [("", "Choose a profile")] + official_profiles + own_profiles
 
     # The "Screen" button in Libraries links here with ?library=<id>.
     if request.method == 'GET':
@@ -579,7 +582,6 @@ def int_or_none(value):
     """Turns the selected option into an int and the "Choose…" option into None,
     so an empty choice reads "This field is required." instead of a coercion error."""
     return int(value) if value not in (None, "") else None
-
 
 class ScreeningForm(FlaskForm):
     library = SelectField("Library", coerce=int_or_none, validators=[DataRequired()])
@@ -684,8 +686,7 @@ def delete_library(id):
 @login_required
 def filter_settings():
     # ------ Query to FilterProfile filtering is_official and is_active, showing Offcial profiles from DB ------
-    official = db.session.scalars(select(FilterProfile).filter_by(is_official=True, is_active=True).order_by(FilterProfile.name)).all()
-    own = db.session.scalars(select(FilterProfile).filter_by(user_id=current_user.id, is_official=False, is_active=True).order_by(FilterProfile.name)).all()
+    official, own = visible_profiles()
     profile_id = request.args.get('profile', type=int)
     selected = next((p for p in official + own if p.id == profile_id), None)
 
@@ -874,6 +875,12 @@ def read_smi(text):
         if parts and not parts[0].startswith("#"):
             compounds.append((number, parts[0], parts[1] if len(parts) > 1 else None))
     return compounds
+
+# ------ Profiles a user can see: the official ones and their own ------
+def visible_profiles():
+    official = db.session.scalars(select(FilterProfile).filter_by(is_official=True, is_active=True).order_by(FilterProfile.name)).all()
+    own = db.session.scalars(select(FilterProfile).filter_by(user_id=current_user.id, is_official=False, is_active=True).order_by(FilterProfile.name)).all()
+    return official, own
 
 # ------ Returns: column name → value, ready for Compound(**descriptors) ------
 def describe(mol):
