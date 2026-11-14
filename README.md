@@ -33,7 +33,7 @@ La **ciclosporina A** es un péptido cíclico de 11 aminoácidos. Está aprobada
  
 | Descriptor | Valor | Límite de Lipinski / Veber |
 |---|---|---|
-| Peso molecular | **1202,63 Da** | ≤ 500 |
+| Peso molecular | **1202,64 Da** | ≤ 500 |
 | LogP | 3,27 | ≤ 5 |
 | Donores de H | 5 | ≤ 5 |
 | Aceptores de H | **12** | ≤ 10 |
