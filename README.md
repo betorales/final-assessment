@@ -49,7 +49,7 @@ Ahí está la brecha. **Las herramientas de referencia están construidas para e
  
 ¿Qué hace este sistema con la misma molécula?
  
-- Con el perfil **Lipinski + Veber** → **rechazada**, y el sistema dice exactamente por qué: MW 1202,63 > 500; HBA 12 > 10; TPSA 278,80 > 140; RotB 15 > 10.
+- Con el perfil **Lipinski + Veber** → **rechazada**, y el sistema dice exactamente por qué: MW 1202,64 > 500; HBA 12 > 10; TPSA 278,80 > 140; RotB 15 > 10.
 - Con el perfil **beyond Ro5** → **aprobada**, con una violación tolerada (TPSA 278,80 > 250, y ese perfil admite hasta dos).
 La misma molécula, dos respuestas distintas, y en ambos casos el motivo queda escrito y guardado. Eso es lo que el sistema aporta: no el cálculo, sino la decisión explicada y trazable.
  
@@ -75,7 +75,7 @@ Una aclaración que me importa, porque es la que me permite dormir tranquilo: **
 | Backend | Flask + Jinja2 |
 | ORM y migraciones | SQLAlchemy + Flask-Migrate |
 | Base de datos | PostgreSQL |
-| Cheminformática | RDKit |
+| Quimioinformática | RDKit |
 | Autenticación | Flask-Login + Werkzeug |
 | Formularios y CSRF | Flask-WTF |
 | Frontend | CSS propio (Grid y Flexbox) + JavaScript vanilla |
@@ -88,7 +88,7 @@ Una aclaración que me importa, porque es la que me permite dormir tranquilo: **
 
 ### Límites declarados
  
-Todo software de cheminformática tiene un límite. Los de este están documentados y se comunican al usuario, en lugar de fallar en silencio:
+Todo software de quimioinformática tiene un límite. Los de este están documentados y se comunican al usuario, en lugar de fallar en silencio:
  
 1. **Máximo 200 átomos pesados.** Por encima, el compuesto se carga pero se marca como fuera de alcance y no se le calculan descriptores. (La ciclosporina tiene 85, así que entra holgada.)
 2. **LogP es un valor calculado**, no experimental. Algoritmos distintos dan resultados distintos para la misma molécula.
