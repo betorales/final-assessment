@@ -19,7 +19,7 @@ from wtforms.validators import (DataRequired, EqualTo, InputRequired, Length, Nu
 # ----- DATABASE -----
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import CheckConstraint, Computed, Identity, MetaData, func, select
+from sqlalchemy import CheckConstraint, Computed, Identity, MetaData, func, select, or_
 
 app = Flask(__name__)
 
@@ -222,6 +222,10 @@ class Screening(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
     total_evaluated = db.Column(db.Integer, nullable=False, server_default="0")
     total_passed = db.Column(db.Integer, nullable=False, server_default="0")
+
+    # ------ Allows to retrieve everything from these tables (LEFT OUTER JOIN) ------
+    library = db.relationship("Library", lazy="joined")
+    filter_profile = db.relationship("FilterProfile", lazy="joined")
 # ------ END SCREENING TABLE ------
 
 # ------ 10. SCREENING RESULT ------
@@ -554,12 +558,14 @@ def screenings():
     # ------ Adding options to library dropdown in Screenings view ------
     available_libraries = db.session.scalars(select(Library).filter_by(user_id=current_user.id).order_by(Library.name)).all()
     official, own = visible_profiles()
-    demo = SimpleNamespace(id=1, library="Demo — reference drugs",
-                           profile="Lipinski + Veber", created_at=datetime(2026, 10, 18, 16, 40),
-                           total_evaluated=12, total_passed=7)
-    pagination = SimpleNamespace(items=[demo], total=1, pages=1, page=1)
-    q = request.args.get('q') or None
-
+    # ------ Show user's screenings ------
+    query=select(Screening).filter_by(user_id=current_user.id).order_by(Screening.created_at.desc())
+    q = request.args.get("q", "").strip() or None
+    if q:
+        query = query.join(Screening.library).join(Screening.filter_profile).where(
+        or_(Library.name.ilike(f"%{q}%"), FilterProfile.name.ilike(f"%{q}%"))
+        )
+    pagination = db.paginate(query, per_page=10)
     form = ScreeningForm()
     form.library.choices = [("", "Choose a library")] + [(b.id, b.name) for b in available_libraries]
     official_profiles = [(p.id, f"{p.name} (Official profile)") for p in official]
@@ -629,7 +635,7 @@ def see_screening(id):
 def libraries():
     # ------ Show user's libraries and find matching libraries name ------
     query = select(Library).filter_by(user_id=current_user.id).order_by(Library.uploaded_at.desc())
-    q = request.args.get("q","").strip()
+    q = request.args.get("q","").strip() or None
     # ------ Filter ONLY if there is something to filter ------
     if q:
         query = query.where(Library.name.ilike(f"%{q}%"))

@@ -67,8 +67,8 @@ Screenings
     <tbody role="rowgroup">
       {% for s in pagination.items %}
       <tr role="row">
-        <td role="cell" class="cell-title">{{ s.library }}</td>
-        <td role="cell" data-label="Profile">{{ s.profile }}</td>
+        <td role="cell" class="cell-title">{{ s.library.name }}</td>
+        <td role="cell" data-label="Profile">{{ s.filter_profile.name }}</td>
         <td role="cell" data-label="Date">
           <time datetime="{{ s.created_at.isoformat() }}">{{ s.created_at.strftime('%d %b %Y, %H:%M') }}</time>
         </td>
@@ -76,7 +76,7 @@ Screenings
         <td role="cell" class="col-num" data-label="Passed"><span class="data">{{ s.total_passed }}</span></td>
         <td role="cell" class="cell-actions">
           <div class="row-actions">
-            <a class="button" href="{{ url_for('see_screening', id=s.id) }}">View results<span class="sr-only"> for {{ s.library }} with {{ s.profile }}</span></a>
+            <a class="button" href="{{ url_for('see_screening', id=s.id) }}">View results<span class="sr-only"> for {{ s.library.name }} with {{ s.filter_profile.name }}</span></a>
           </div>
         </td>
       </tr>
