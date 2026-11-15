@@ -1,0 +1,86 @@
+{% extends 'base.html'%}
+
+{% block title %}
+Screening
+{% endblock %}
+
+{% block nav %}
+{% include 'nav.html'%}
+{% endblock %}
+
+
+{% block content %}
+
+{% from "_macros.html" import pagination_nav %}
+
+<div class="page-header">
+   <div class="page-header-text">
+     <h1 class="display">{{ screening.library.name }}</h1>
+     <p class="text-secondary">{{screening.filter_profile.name}}</p>
+     <p class="text-secondary"> {{ screening.created_at.strftime('%d %b %Y, %H:%M') }} </p>
+   </div>
+ </div>
+
+<dl class="stats">
+   <div><dt>Evaluated</dt><dd>{{ screening.total_evaluated }}</dd></div>
+   <div><dt>Passed</dt><dd>{{ screening.total_passed }}</dd></div>
+   <div><dt>Rejected</dt><dd>{{ screening.total_evaluated - screening.total_passed }}</dd></div>
+</dl>
+
+<div class="table-wrapper">
+   <div class="table-scroll">
+     <table class="results-table" aria-label="Results">
+       <thead>
+         <tr>
+           <th scope="col">Compound</th>
+           <th scope="col" class="col-num">MW</th>
+           <th scope="col" class="col-num">LogP</th>
+           <th scope="col" class="col-num">HBD</th>
+           <th scope="col" class="col-num">HBA</th>
+           <th scope="col" class="col-num">TPSA</th>
+           <th scope="col" class="col-num">RotB</th>
+           <th scope="col" class="col-num cell-qed">QED</th>
+           <th scope="col">Result</th>
+         </tr>
+       </thead>
+       <tbody>
+         {% for r in pagination.items %}
+         <tr>
+           <td class="cell-compound">
+             <div class="compound">
+               <span class="name">{{ r.compound.name }}</span>
+               <span class="identifiers">{{ r.compound.inchikey }}</span>
+             </div>
+           </td>
+           <td class="cell-data col-num" data-label="MW">{{ r.compound.molecular_weight }}</td>
+           <td class="cell-data col-num" data-label="CLogP">{{ r.compound.clogp }}</td>
+           <td class="cell-data col-num" data-label="HBD">{{ r.compound.hbd }}</td>
+           <td class="cell-data col-num" data-label="HBA">{{ r.compound.hba }}</td>
+           <td class="cell-data col-num" data-label="TPSA">{{ r.compound.tpsa }}</td>
+           <td class="cell-data col-num" data-label="RotB">{{ r.compound.rotatable_bonds }}</td>
+           <td class="cell-qed col-num">{{ r.compound.qed }}</td>
+           {# ------ Result: out of scope, passed or rejected ------ #}
+           <td class="cell-result">
+             <div class="result">
+               {% if r.compound.out_of_scope %}
+               <span class="status status--out-of-scope">Out of scope</span>
+               {% elif r.passed %}
+               <span class="status status--passed">Passed</span>
+               {% else %}
+               <span class="status status--rejected">Rejected</span>
+               {% endif %}
+               {% if r.reason %}
+               <span class="reason">{{ r.reason }}</span>
+               {% endif %}
+             </div>
+           </td>
+         </tr>
+         {% endfor %}
+       </tbody>
+     </table>
+   </div>
+ </div>
+ 
+ {{ pagination_nav(pagination, 'see_screening', id=screening.id) }}
+
+{% endblock %}

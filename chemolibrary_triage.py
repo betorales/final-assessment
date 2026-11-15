@@ -237,6 +237,8 @@ class ScreeningResult(db.Model):
     passed = db.Column(db.Boolean, nullable=False)
     violations = db.Column(db.SmallInteger, nullable=False, server_default="0")
     reason = db.Column(db.Text)  # e.g. "MW 1202.63 > 500; HBA 12 > 10"
+
+    compound = db.relationship("Compound", lazy="joined")
 # ------ END SCREENING RESULT TABLE -------
 
 # ------ END ------
@@ -318,7 +320,6 @@ def home():
             form.form_errors.append("Incorrect email or password.")
 
     return render_template("home.html", form=form)
-
 
 class RegisterForm(FlaskForm):
     name = StringField("Name", validators=[DataRequired(), Length(max=100)])
@@ -624,7 +625,14 @@ class ScreeningForm(FlaskForm):
 @app.route('/screenings/<int:id>')
 @login_required
 def see_screening(id):
-    return redirect(url_for('screenings'))
+    screening = db.get_or_404(Screening, id)
+    if screening.user_id != current_user.id:
+        abort(404)
+
+    query=select(ScreeningResult).filter_by(screening_id=screening.id).order_by(ScreeningResult.compound_id)
+    pagination = db.paginate(query, per_page=20)
+    
+    return render_template('screening.html', screening=screening, pagination=pagination)
 
 # ------ END SCREENINGS ------
 
