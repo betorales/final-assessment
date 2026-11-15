@@ -571,10 +571,38 @@ def screenings():
         form.library.data = request.args.get('library', type=int)
 
     if form.validate_on_submit():
-        # TODO (database): create the screening, evaluate every compound in the
-        # library against the profile, store one result per compound, then
-        # return redirect(url_for('see_screening', id=screening.id)).
-        return redirect(url_for('screenings'))
+        library = db.session.get(Library, form.library.data)
+        profile = db.session.get(FilterProfile, form.filter_profile.data)
+        # ------ To create a screening ------
+        screening = Screening(
+            user_id=current_user.id,
+            library_id=library.id,
+            filter_profile_id=profile.id
+        )
+        db.session.add(screening)
+        db.session.flush()
+        # ------ Compounds in the chosen library ------
+        compounds = db.session.scalars(select(Compound).join(CompoundLibrary).where(CompoundLibrary.library_id == library.id)).all()
+        total_passed = 0
+        # ------ Evaluate and store one result per compound ------
+        for compound in compounds:
+            passed, violations, reason = evaluate(compound, profile)
+            if passed:
+                total_passed += 1
+            screening_result=ScreeningResult(
+                screening_id=screening.id,
+                compound_id=compound.id,
+                passed=passed,
+                violations=violations,
+                reason=reason
+            )
+            db.session.add(screening_result)
+
+        total_evaluated=len(compounds)
+        screening.total_evaluated=total_evaluated
+        screening.total_passed=total_passed
+        db.session.commit()
+        return redirect(url_for('see_screening', id=screening.id))
 
     return render_template('screenings.html', form=form, pagination=pagination, q=q)
 
@@ -825,7 +853,6 @@ DEMO_SMI_PATH = Path(app.root_path) / "data" / "demo_compounds.smi"
 # ------ Other functions ------
 def validate_compounds(compounds):
     # ------ Extract valid and rejected SMILES ------
-    
     from rdkit import Chem, rdBase
     rdBase.LogToPythonStderr()
     valid = []
