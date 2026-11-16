@@ -847,6 +847,42 @@ class AlertForm(FlaskForm):
     description = TextAreaField("Description", validators=[Optional()])
     reference = StringField("Reference", validators=[Optional(), Length(max=255)])
 
+# ------ Add alerts ------
+@app.cli.command("seed-alerts")
+def seed_alerts():
+    from rdkit.Chem.FilterCatalog import FilterCatalog, FilterCatalogParams
+    from rdkit import RDConfig
+    import csv
+
+    families = {}
+    # ------ Adding alerts from catalog ------
+    for family in ("PAINS_A", "PAINS_B", "PAINS_C"):
+        params = FilterCatalogParams()
+        params.AddCatalog(getattr(FilterCatalogParams.FilterCatalogs, family))
+        catalog = FilterCatalog(params)
+        for i in range(catalog.GetNumEntries()):
+            name = catalog.GetEntryWithIdx(i).GetDescription()
+            families[name] = family
+    pains_file_route = Path(RDConfig.RDDataDir)/"Pains"/"wehi_pains.csv"
+    alerts_created = 0
+    with pains_file_route.open(mode="r", encoding="utf-8") as pains_file:
+        reader = csv.reader(pains_file)
+        for smarts, reg_id in reader:
+            name = reg_id.removeprefix("<regId=").removesuffix(">")
+            existing = db.session.scalar(select(StructuralAlert).filter_by(name=name))
+            if existing is None:
+                alerts_created += 1
+                structural_alert=StructuralAlert(
+                    family=families[name],
+                    name=name,
+                    smarts=smarts,
+                    severity="discard",
+                    reference="Baell & Holloway, J Med Chem 2010. doi:10.1021/jm901137j"
+                )
+                db.session.add(structural_alert)
+    db.session.commit()
+    click.echo(f"Created {alerts_created} PAINS alerts")
+
 # TEST ONLY: ALERTS
 
 DEMO_ALERTS = [
@@ -863,6 +899,7 @@ DEMO_ALERTS = [
 ]
 
 DEMO_SMI_PATH = Path(app.root_path) / "data" / "demo_compounds.smi"
+# ------ END ALERTS -------
 
 # ------ Other functions ------
 def validate_compounds(compounds):
@@ -983,7 +1020,6 @@ def preview_pattern(smarts):
         if mol is not None and mol.HasSubstructMatch(pattern):
             matches.append(name)
     return {"matches": matches, "total": len(compounds)}
-# ------ END ALERTS -------
 
 if __name__ == "__main__":
     app.run(debug=True)
