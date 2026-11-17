@@ -19,7 +19,7 @@ from wtforms.validators import (DataRequired, EqualTo, InputRequired, Length, Nu
 # ----- DATABASE -----
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import CheckConstraint, Computed, Identity, MetaData, func, select, or_
+from sqlalchemy import CheckConstraint, Computed, Identity, MetaData, func, select, or_, delete
 
 app = Flask(__name__)
 
@@ -665,11 +665,12 @@ def upload_libraries():
         unique, duplicates = deduplicate(valid)
         described = []
         out_of_scope = 0
+        patterns = compile_alerts() # Checked
         for  number, canonical, name, mol in unique:
             descriptors = describe(mol)
             if descriptors["heavy_atoms"] > MAX_HEAVY_ATOMS:
                 out_of_scope += 1
-            described.append((number, canonical, name, descriptors))
+            described.append((number, canonical, name, descriptors, mol)) # Checked
         # ------ Create a library ------
         library = Library(
             user_id=current_user.id,
@@ -679,7 +680,7 @@ def upload_libraries():
         db.session.add(library)
         db.session.flush()
         # ------ Search for or create a compound ------
-        for number, canonical, name, descriptors in described:
+        for number, canonical, name, descriptors, mol in described:
             compound = db.session.scalar(select(Compound).filter_by(canonical_smiles=canonical))
             if compound is None:
                 compound = Compound(
@@ -689,6 +690,16 @@ def upload_libraries():
                 )
                 db.session.add(compound)
                 db.session.flush()
+                # ------ New compounds in scope: record their structural alerts ------
+                if not compound.out_of_scope:
+                    matches = match_alerts(mol, patterns)
+                    for alert_id, match_count in matches:
+                        compound_alert=CompoundAlert(
+                            compound_id=compound.id,
+                            alert_id=alert_id,
+                            match_count=match_count
+                        )
+                        db.session.add(compound_alert)
             # ------ Link to library. Several libraries, not several compounds  ------
             compound_library = CompoundLibrary(
                 library_id=library.id,
@@ -901,6 +912,29 @@ DEMO_ALERTS = [
 DEMO_SMI_PATH = Path(app.root_path) / "data" / "demo_compounds.smi"
 # ------ END ALERTS -------
 
+# ------ Rebuild alerts if they were created previous any action ------
+@app.cli.command("rebuild-alerts")
+def rebuild_compound_alerts():
+    from rdkit import Chem
+
+    db.session.execute(delete(CompoundAlert))
+    patterns = compile_alerts()
+    compounds = db.session.scalars(select(Compound).filter_by(out_of_scope=False)).all()
+    rows_created = 0
+    for compound in compounds:
+        mol = Chem.MolFromSmiles(compound.canonical_smiles)
+        matches = match_alerts(mol, patterns)
+        for alert_id, match_count in matches:
+            rows_created += 1
+            compound_alert=CompoundAlert(
+                compound_id=compound.id,
+                alert_id=alert_id,
+                match_count=match_count
+            )
+            db.session.add(compound_alert)
+    db.session.commit()   
+    click.echo(rows_created)
+ 
 # ------ Other functions ------
 def validate_compounds(compounds):
     # ------ Extract valid and rejected SMILES ------
@@ -1007,6 +1041,26 @@ def evaluate(compound, profile):
     else:
         reason = None
     return passed, violations, reason
+
+# ------ Helper: returns all structural alerts and return a list ------
+def compile_alerts():
+    from rdkit import Chem
+
+    patterns = []
+    alerts = db.session.scalars(select(StructuralAlert)).all()
+    for alert in alerts:
+        pattern = Chem.MolFromSmarts(alert.smarts, mergeHs=True)
+        patterns.append((alert.id, pattern))
+    return patterns
+
+# ------ Helper: matches a molecule and patterns ------
+def match_alerts(mol, patterns):
+    matches = []
+    for alert_id, pattern in patterns:
+        len_matches = len(mol.GetSubstructMatches(pattern))
+        if len_matches > 0:
+            matches.append((alert_id, len_matches))
+    return matches
 
 def preview_pattern(smarts):
     """Matches the pattern against the loaded compounds without saving anything."""
