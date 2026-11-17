@@ -741,6 +741,15 @@ def see_library(id):
 @app.route('/libraries/<int:id>/delete', methods=['POST'])
 @login_required
 def delete_library(id):
+    # ------ Get the library to be deleted ------
+    library = db.get_or_404(Library, id)
+    if library.user_id != current_user.id:
+        abort(404)
+
+    db.session.delete(library)
+    db.session.commit()
+    flash("Library deleted", "success")
+    
     return redirect(url_for('libraries'))
 
 # ------ END LIBRARIES ------

@@ -112,6 +112,9 @@ Todo software de quimioinformática tiene un límite. Los de este están documen
 2. Solo cuentan las alertas activas, porque el curador puede desactivar una alerta que considere demasiado estricta.
 3. `evaluate` sigue sin consultar la base directamente. Las alertas le llegan a través del compuesto.
 
+**Borrar:**
+
+1. Al borrar una librería, no se borran los compuestos. Justamente, por eso existe al deduplicación de compuestos. Todos son reutilizables.
 ---
 
 ## Autor
