@@ -184,6 +184,7 @@ class CompoundLibrary(db.Model):
     library_id = db.Column(db.Integer, db.ForeignKey("library.id", ondelete="CASCADE"), primary_key=True)
     compound_id = db.Column(db.Integer, db.ForeignKey("compound.id"), primary_key=True)
     external_code = db.Column(db.String(50))  # the compound's ID in the uploaded file (vendor code, ChEMBL ID…)
+    compound = db.relationship("Compound", lazy="joined")
 # ------ END COMPOUND LIBRARY TABLE ------
 
 # ------ 7. STRUCTURAL ALERT ------
@@ -729,7 +730,13 @@ def upload_libraries():
 @app.route('/libraries/<int:id>')
 @login_required
 def see_library(id):
-    return redirect(url_for('libraries'))
+    library = db.get_or_404(Library, id)
+    if library.user_id != current_user.id:
+        abort(404)
+
+    query = select(CompoundLibrary).filter_by(library_id=library.id).order_by(CompoundLibrary.compound_id)
+    pagination=db.paginate(query, per_page=10)
+    return render_template('library.html', library=library, pagination=pagination)
 
 @app.route('/libraries/<int:id>/delete', methods=['POST'])
 @login_required

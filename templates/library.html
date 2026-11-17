@@ -1,0 +1,83 @@
+{% extends 'base.html'%}
+
+{% block title %}
+Library
+{% endblock %}
+
+{% block nav %}
+{% include 'nav.html'%}
+{% endblock %}
+
+{% block content %}
+
+{% from "_macros.html" import pagination_nav %}
+
+<div class="page-header">
+   <div class="page-header-text">
+     <h1 class="display">{{ library.name }}</h1>
+     <p>{{ library.uploaded_at.strftime('%d %b %Y, %H:%M') }}</p>
+     <p>{{library.description}}</p>
+   </div>
+   <div class="actions">
+    <a class="button button--primary" href="{{ url_for('screenings', library=library.id) }}">Screen this library</a>
+  </div>
+</div>
+
+<dl class="stats">
+   <div>
+      <dt>Compound<dd>{{library.compound_count}}</dd></dt>
+   </div>
+</dl>
+
+<div class="table-wrapper">
+   <div class="table-scroll">
+     <table class="results-table" aria-label="Compounds">
+       <thead>
+         <tr>
+           <th scope="col">Compound</th>
+           <th scope="col" class="col-num">MW</th>
+           <th scope="col" class="col-num">LogP</th>
+           <th scope="col" class="col-num">HBD</th>
+           <th scope="col" class="col-num">HBA</th>
+           <th scope="col" class="col-num">TPSA</th>
+           <th scope="col" class="col-num">RotB</th>
+           <th scope="col" class="col-num cell-qed">QED</th>
+           <th scope="col">Alerts</th>
+         </tr>
+       </thead>
+       <tbody>
+         {% for row in pagination.items %}
+         <tr>
+           <td class="cell-compound">
+             <div class="compound">
+               <span class="name">{{ row.external_code or row.compound.name }}</span>
+               <span class="identifiers">{{ row.compound.inchikey }}</span>
+             </div>
+           </td>
+           <td class="cell-data col-num" data-label="MW">{{ row.compound.molecular_weight }}</td>
+           <td class="cell-data col-num" data-label="CLogP">{{ row.compound.clogp }}</td>
+           <td class="cell-data col-num" data-label="HBD">{{ row.compound.hbd }}</td>
+           <td class="cell-data col-num" data-label="HBA">{{ row.compound.hba }}</td>
+           <td class="cell-data col-num" data-label="TPSA">{{ row.compound.tpsa }}</td>
+           <td class="cell-data col-num" data-label="RotB">{{ row.compound.rotatable_bonds }}</td>
+           <td class="cell-qed col-num">{{ row.compound.qed }}</td>
+           
+           <td class="cell-result">
+             <div class="result">
+               {% for a in row.compound.alerts if a.is_active %}
+               <span class="alert alert--{{ a.severity }}">{{ a.name }}</span>
+               {% else %}
+               -
+               {% endfor %}
+             </div>
+           </td>
+         </tr>
+         {% endfor %}
+       </tbody>
+     </table>
+   </div>
+ </div>
+ 
+ {{ pagination_nav(pagination, 'see_library', id=library.id) }}
+
+{% endblock %}
