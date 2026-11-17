@@ -169,6 +169,12 @@ class Compound(db.Model):
 
     out_of_scope = db.Column(db.Boolean, Computed(f"heavy_atoms > {MAX_HEAVY_ATOMS}", persisted=True))
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    """
+    This allows that a compound knows what alerts has.
+    Also, simplify the Neon process using selectin
+    """
+    alerts = db.relationship("StructuralAlert", secondary="compound_alert", viewonly=True, lazy="selectin")
 # ------ END COMPOUND TABLE ------
 
 # ------ 6. COMPOUND LIBRARY ------
@@ -670,7 +676,7 @@ def upload_libraries():
             descriptors = describe(mol)
             if descriptors["heavy_atoms"] > MAX_HEAVY_ATOMS:
                 out_of_scope += 1
-            described.append((number, canonical, name, descriptors, mol)) # Checked
+            described.append((number, canonical, name, descriptors, mol))
         # ------ Create a library ------
         library = Library(
             user_id=current_user.id,
@@ -1017,9 +1023,9 @@ def describe(mol):
 
 # ------ To evaluate compounds vs profile ------
 def evaluate(compound, profile):
-    reasons = []
     if compound.out_of_scope:
         return False, 0, f"Out of scope: {compound.heavy_atoms} heavy atoms > {MAX_HEAVY_ATOMS}."
+    reasons = []
     if profile.mw_max is not None and compound.molecular_weight > profile.mw_max:
         reasons.append(f"MW: {compound.molecular_weight} > {profile.mw_max}")
     if profile.logp_min is not None and compound.clogp < profile.logp_min:
@@ -1034,8 +1040,17 @@ def evaluate(compound, profile):
         reasons.append(f"TPSA: {compound.tpsa} > {profile.tpsa_max}")
     if profile.rotb_max is not None and compound.rotatable_bonds > profile.rotb_max:
         reasons.append(f"Rotatable bonds: {compound.rotatable_bonds} > {profile.rotb_max}")
+    # ------ Counted before the alerts: an alert is not a rule violation ------
     violations = len(reasons)
-    passed = violations <= profile.allowed_violations
+    discarded = False
+    # ------ Add alerts to reasons (Results) ------
+    if profile.apply_alerts:
+        for alert in compound.alerts:
+            if alert.is_active:
+                reasons.append(f"{alert.family}: {alert.name}")
+                if alert.severity == "discard":
+                    discarded = True
+    passed = violations <= profile.allowed_violations and not discarded
     if reasons:
         reason = "; ".join(reasons)
     else:

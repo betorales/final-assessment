@@ -104,6 +104,16 @@ Todo software de quimioinformática tiene un límite. Los de este están documen
 
 ---
 
+## Decisiones de diseño
+
+**Alerts:**
+
+1. Las alertas no suman violaciones. violations sigue contando solo reglas fisicoquímicas (MW, LogP, otros…). Una alerta es otro tipo de problema, y mezclarlos haría que allowed_violations perdiera su sentido.
+2. Solo cuentan las alertas activas, porque el curador puede desactivar una alerta que considere demasiado estricta.
+3. `evaluate` sigue sin consultar la base directamente. Las alertas le llegan a través del compuesto.
+
+---
+
 ## Autor
  
 Alberto Morales - Farmacéutico y docente, estudiante de Analista Programador.
