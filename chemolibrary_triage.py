@@ -1079,7 +1079,7 @@ def compile_alerts():
         patterns.append((alert.id, pattern))
     return patterns
 
-# ------ Helper: matches a molecule and patterns ------
+# ------ Helper: finds user's libraries ------
 def user_libraries(q):
     # ------ Show user's libraries and find matching libraries name ------
     query = select(Library).filter_by(user_id=current_user.id).order_by(Library.uploaded_at.desc())
@@ -1088,7 +1088,8 @@ def user_libraries(q):
         query = query.where(Library.name.ilike(f"%{q}%"))
     pagination = db.paginate(query, per_page=10)
     return pagination
-    
+
+# ------ Helper: matches a molecule and patterns ------    
 def match_alerts(mol, patterns):
     matches = []
     for alert_id, pattern in patterns:
