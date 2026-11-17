@@ -33,16 +33,16 @@ Libraries
   </div>
   {% if summary.rejections %}
   <ul class="rejection-list">
-    {% for r in summary.rejections[:10] %}
+    {% for r in summary.rejections %}
     <li>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
       <span>Line {{ r.line }}: {{ r.reason }}</span>
     </li>
     {% endfor %}
   </ul>
-  {% if summary.rejections|length > 10 %}
-  {# Update this line because sessing was added to keep and prevent summary is gone. summary.rejections|length - 10 -> actual code (below) #}
-  <p class="caption">And {{ summary.invalid + summary.duplicates }} more lines with problems.</p>
+  {% if summary.invalid + summary.duplicates > summary.rejections|length %}
+  {# ------ Only 10 examples travel in the cookie; the counters hold the totals ------ #}
+  <p class="caption">And {{ summary.invalid + summary.duplicates - summary.rejections|length }} more lines with problems.</p>
   {% endif %}
   {% endif %}
 </section>

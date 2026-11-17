@@ -59,6 +59,9 @@ LOCK_MINUTES = 15
 # Heavy atoms env var
 MAX_HEAVY_ATOMS = 200
 
+# Shown rejections
+MAX_SHOWN_REJECTIONS = 10
+
 # ------ TABLES ------
 # CHECK constraints go in __table_args__ and need a name: Flask-Migrate skips
 # the ones written inside a column.
@@ -648,13 +651,8 @@ def see_screening(id):
 @app.route('/libraries')
 @login_required
 def libraries():
-    # ------ Show user's libraries and find matching libraries name ------
-    query = select(Library).filter_by(user_id=current_user.id).order_by(Library.uploaded_at.desc())
     q = request.args.get("q","").strip() or None
-    # ------ Filter ONLY if there is something to filter ------
-    if q:
-        query = query.where(Library.name.ilike(f"%{q}%"))
-    pagination = db.paginate(query, per_page=10)
+    pagination= user_libraries(q)
     # ------ Keeping summary in screen ------
     summary = session.pop("upload_summary", None)
     return render_template('libraries.html', pagination=pagination, q=q, form=LibraryForm(), summary=summary)
@@ -716,15 +714,12 @@ def upload_libraries():
             db.session.add(compound_library)
         db.session.commit()
         # ------ Creating a summary ------
-        summary = {"name":library.name, "loaded":len(described), "duplicates":len(duplicates), "invalid":len(rejections), "out_of_scope":out_of_scope, "rejections":duplicates + rejections}
+        summary = {"name":library.name, "loaded":len(described), "duplicates":len(duplicates), "invalid":len(rejections), "out_of_scope":out_of_scope, "rejections":(duplicates + rejections)[:MAX_SHOWN_REJECTIONS]}
         # ------ Keeping summary in screen ------
         session["upload_summary"] = summary
-        # ------ Only 10 issues are shown, since a 4 KB cookie (session), so they will be saved ------
-        rejections[:10]
         return redirect(url_for('libraries'))
     else:
-        demo = SimpleNamespace(id=1, name="Demo — reference drugs", uploaded_at=datetime(2026, 10, 18), compound_count=12)
-        pagination = SimpleNamespace(items=[demo], total=1, pages=1, page=1)
+        pagination=user_libraries(None)
         return render_template('libraries.html', pagination=pagination, q=None, form=form, summary=None)
 
 @app.route('/libraries/<int:id>')
@@ -1085,6 +1080,15 @@ def compile_alerts():
     return patterns
 
 # ------ Helper: matches a molecule and patterns ------
+def user_libraries(q):
+    # ------ Show user's libraries and find matching libraries name ------
+    query = select(Library).filter_by(user_id=current_user.id).order_by(Library.uploaded_at.desc())
+    # ------ Filter ONLY if there is something to filter ------
+    if q:
+        query = query.where(Library.name.ilike(f"%{q}%"))
+    pagination = db.paginate(query, per_page=10)
+    return pagination
+    
 def match_alerts(mol, patterns):
     matches = []
     for alert_id, pattern in patterns:
