@@ -56,21 +56,21 @@ Alerts
       </thead>
       <tbody role="rowgroup">
         {% for a in catalog.items %}
-        <tr role="row"{% if not a.active %} class="row-inactive"{% endif %}>
+        <tr role="row"{% if not a.is_active %} class="row-inactive"{% endif %}>
           <td role="cell" class="cell-title">{{ a.name }}</td>
           <td role="cell" data-label="Family">{{ a.family|replace('_', ' ') }}</td>
           <td role="cell" data-label="Severity">
             <span class="alert alert--{{ a.severity }} alert--word">{{ a.severity|capitalize }}</span>
           </td>
-          <td role="cell" class="col-num" data-label="Matches"><span class="data">{{ a.matches }}</span></td>
-          <td role="cell" data-label="Status">{{ "Active" if a.active else "Inactive" }}</td>
+          <td role="cell" class="col-num" data-label="Matches"><span class="data">{{ a.compound_count }}</span></td>
+          <td role="cell" data-label="Status">{{ "Active" if a.is_active else "Inactive" }}</td>
           <td role="cell" class="cell-actions">
             <div class="row-actions">
               {# Deactivate instead of delete: compound_alert rows and past
                  screenings still point to this alert. #}
               <form method="post" action="{{ url_for('toggle_alert', id=a.id) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="button">{{ "Deactivate" if a.active else "Activate" }}<span class="sr-only"> {{ a.name }}</span></button>
+                <button type="submit" class="button">{{ "Deactivate" if a.is_active else "Activate" }}<span class="sr-only"> {{ a.name }}</span></button>
               </form>
             </div>
           </td>

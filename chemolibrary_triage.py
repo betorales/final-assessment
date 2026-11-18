@@ -206,6 +206,10 @@ class StructuralAlert(db.Model):
     description = db.Column(db.Text)
     reference = db.Column(db.String(255))
     is_active = db.Column(db.Boolean, nullable=False, server_default="true")
+
+    @property
+    def compound_count(self):
+        return db.session.scalar(select(func.count()).select_from(CompoundAlert).where(CompoundAlert.alert_id==self.id))
 # ------ END STRUCTURAL ALERT TABLE ------
 
 # ------ 8. COMPOUND ALERT ------
@@ -821,19 +825,20 @@ def alerts():
     # Filtering the demo data; with a database these become query conditions.
     family = request.args.get('family') or None
     q = (request.args.get('q') or '').strip() or None
-    all_alerts = [SimpleNamespace(**a) for a in DEMO_ALERTS]
+    query = select(StructuralAlert).order_by(StructuralAlert.family, StructuralAlert.name)
+    
+    if family:
+        query = query.where(StructuralAlert.family.startswith(family))
 
-    def group(alert):  # PAINS_A, PAINS_B, PAINS_C → PAINS
-        return alert.family.split('_')[0]
+    if q:
+        query = query.where(StructuralAlert.name.ilike(f"%{q}%"))
+    
+    catalog=db.paginate(query, per_page=20)
 
-    filtered = [a for a in all_alerts
-                if (not family or group(a) == family)
-                and (not q or q.lower() in a.name.lower())]
-    families = [dict(key=None, label="All", count=len(all_alerts))] + [
-        dict(key=key, label=label, count=sum(group(a) == key for a in all_alerts))
-        for key, label in (("PAINS", "PAINS"), ("BRENK", "BRENK"), ("REACTIVE", "Reactive"))
-    ]
-    catalog = SimpleNamespace(items=filtered, total=len(filtered), pages=1, page=1)
+    families = []
+    families.append(dict(key=None, label="All", count=db.session.scalar(select(func.count()).select_from(StructuralAlert))))
+    for key, label in (("PAINS", "PAINS"), ("BRENK", "BRENK"), ("REACTIVE", "Reactive")):
+        families.append(dict(key=key, label=label, count=db.session.scalar(select(func.count()).select_from(StructuralAlert).where(StructuralAlert.family.startswith(key)))))
 
     return render_template('alerts.html', catalog=catalog, families=families,
                            family=family, q=q, form=form, preview=preview)
@@ -842,6 +847,11 @@ def alerts():
 @curator_required
 def toggle_alert(id):
     # TODO (database): flip alert.active and save.
+    alert=db.get_or_404(StructuralAlert, id)
+    alert.is_active=not alert.is_active
+    db.session.commit()
+    state = "activated" if alert.is_active else "deactivated"
+    flash(f"Alert {alert.name }has changed: {state}", "success")
     return redirect(url_for('alerts'))
 
 def valid_smarts(form, field):
@@ -910,21 +920,6 @@ def seed_alerts():
                 db.session.add(structural_alert)
     db.session.commit()
     click.echo(f"Created {alerts_created} PAINS alerts")
-
-# TEST ONLY: ALERTS
-
-DEMO_ALERTS = [
-    dict(id=1, family="PAINS_A", name="ene_rhod_A(235)", severity="discard", matches=1, active=True),
-    dict(id=2, family="BRENK", name="isolated_alkene", severity="warning", matches=2, active=True),
-    dict(id=3, family="BRENK", name="phenol_ester", severity="warning", matches=1, active=True),
-    dict(id=4, family="BRENK", name="hydroquinone", severity="warning", matches=1, active=True),
-    dict(id=5, family="BRENK", name="imine_1", severity="warning", matches=1, active=True),
-    dict(id=6, family="BRENK", name="imine_2", severity="warning", matches=1, active=True),
-    dict(id=7, family="BRENK", name="diketo_group", severity="warning", matches=1, active=True),
-    dict(id=8, family="BRENK", name="Michael_acceptor_1", severity="warning", matches=1, active=True),
-    dict(id=9, family="BRENK", name="Thiocarbonyl_group", severity="warning", matches=1, active=True),
-    dict(id=10, family="REACTIVE", name="aldehyde", severity="warning", matches=0, active=False),
-]
 
 DEMO_SMI_PATH = Path(app.root_path) / "data" / "demo_compounds.smi"
 # ------ END ALERTS -------
