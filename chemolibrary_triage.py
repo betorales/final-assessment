@@ -809,6 +809,7 @@ def filter_settings():
 @app.route('/alerts', methods=['GET', 'POST'])
 @curator_required
 def alerts():
+    from rdkit import Chem
     form = AlertForm()
     preview = None
 
@@ -818,8 +819,25 @@ def alerts():
             if form.smarts.validate(form):
                 preview = preview_pattern(form.smarts.data)
         elif form.validate_on_submit():
-            # TODO (database): save the alert, match it against every loaded
+            # Save an alert, match it against every loaded
             # compound and record the compound_alert rows.
+            alert=StructuralAlert()
+            form.populate_obj(alert)
+            db.session.add(alert)
+            db.session.flush()
+            pattern = Chem.MolFromSmarts(alert.smarts, mergeHs=True)
+            compounds = db.session.scalars(select(Compound).filter_by(out_of_scope=False)).all()
+            for compound in compounds:
+                mol = Chem.MolFromSmiles(compound.canonical_smiles)
+                matches = match_alerts(mol, [(alert.id, pattern)])
+                for alert_id, match_count in matches:
+                    compound_alert=CompoundAlert(
+                        compound_id=compound.id,
+                        alert_id=alert_id,
+                        match_count=match_count
+                    )
+                    db.session.add(compound_alert)
+            db.session.commit()
             return redirect(url_for('alerts'))
 
     # Filtering the demo data; with a database these become query conditions.
@@ -884,6 +902,10 @@ class AlertForm(FlaskForm):
     description = TextAreaField("Description", validators=[Optional()])
     reference = StringField("Reference", validators=[Optional(), Length(max=255)])
 
+    def validate_name(self, field):
+        if db.session.scalar(select(StructuralAlert.id).filter_by(name=field.data)):
+            raise ValidationError("This name is already used.")
+
 # ------ Add alerts ------
 @app.cli.command("seed-alerts")
 def seed_alerts():
@@ -919,8 +941,6 @@ def seed_alerts():
                 db.session.add(structural_alert)
     db.session.commit()
     click.echo(f"Created {alerts_created} PAINS alerts")
-
-DEMO_SMI_PATH = Path(app.root_path) / "data" / "demo_compounds.smi"
 # ------ END ALERTS -------
 
 # ------ Rebuild alerts if they were created previous any action ------
@@ -1096,13 +1116,13 @@ def preview_pattern(smarts):
     """Matches the pattern against the loaded compounds without saving anything."""
     from rdkit import Chem
 
-    pattern = Chem.MolFromSmarts(smarts)
-    compounds = read_smi(DEMO_SMI_PATH.read_text(encoding="utf-8"))
+    pattern = Chem.MolFromSmarts(smarts, mergeHs=True)
+    compounds = db.session.scalars(select(Compound).filter_by(out_of_scope=False)).all()
     matches = []
-    for _, smiles, name in compounds:
-        mol = Chem.MolFromSmiles(smiles)
-        if mol is not None and mol.HasSubstructMatch(pattern):
-            matches.append(name)
+    for compound in compounds:
+        mol = Chem.MolFromSmiles(compound.canonical_smiles)
+        if mol.HasSubstructMatch(pattern):
+            matches.append(compound.name)
     return {"matches": matches, "total": len(compounds)}
 
 if __name__ == "__main__":
