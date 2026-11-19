@@ -846,7 +846,6 @@ def alerts():
 @app.route('/alerts/<int:id>/toggle', methods=['POST'])
 @curator_required
 def toggle_alert(id):
-    # TODO (database): flip alert.active and save.
     alert=db.get_or_404(StructuralAlert, id)
     alert.is_active=not alert.is_active
     db.session.commit()
