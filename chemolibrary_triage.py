@@ -699,24 +699,9 @@ def libraries():
 def upload_libraries():
     form = LibraryForm()
     if form.validate_on_submit():
-        uploaded_file = form.file.data
         # ------ Some files require another utf-8, like Windows devices ------
-        import time
-        t0 = time.perf_counter() # TP
-        text = uploaded_file.read().decode("utf-8-sig")
-        compounds = read_smi(text)
-        valid, rejections = validate_compounds(compounds)
-        unique, duplicates = deduplicate(valid)
-        described = []
-        out_of_scope = 0
-        patterns = compile_alerts()
-        for  number, canonical, name, mol in unique:
-            descriptors = describe(mol)
-            if descriptors["heavy_atoms"] > MAX_HEAVY_ATOMS:
-                out_of_scope += 1
-            described.append((number, canonical, name, descriptors, mol))
+        text = form.file.data.read().decode("utf-8-sig")
         # ------ Create a library ------
-        t1 = time.perf_counter() # TP
         library = Library(
             user_id=current_user.id,
             name=form.name.data,
@@ -724,44 +709,12 @@ def upload_libraries():
         )
         db.session.add(library)
         db.session.flush()
-        alerts_time = 0 # TP
-        # ------ Search for or create a compound ------
-        for number, canonical, name, descriptors, mol in described:
-            compound = db.session.scalar(select(Compound).filter_by(canonical_smiles=canonical))
-            if compound is None:
-                compound = Compound(
-                    canonical_smiles=canonical, 
-                    name=name, 
-                    **descriptors
-                )
-                db.session.add(compound)
-                db.session.flush()
-                # ------ New compounds in scope: record their structural alerts ------
-                if not compound.out_of_scope:
-                    ta = time.perf_counter()
-                    matches = match_alerts(mol, patterns)
-                    alerts_time+=time.perf_counter()-ta
-                    for alert_id, match_count in matches:
-                        compound_alert=CompoundAlert(
-                            compound_id=compound.id,
-                            alert_id=alert_id,
-                            match_count=match_count
-                        )
-                        db.session.add(compound_alert)
-            # ------ Link to library. Several libraries, not several compounds  ------
-            compound_library = CompoundLibrary(
-                library_id=library.id,
-                compound_id=compound.id,
-                external_code=name
-            )
-            db.session.add(compound_library)
+        # ------ The whole file is saved as a single batch that starts at line 1 ------
+        counts = save_batch(library, text, 1, compile_alerts())
         db.session.commit()
-        t2 = time.perf_counter() # TP
-        app.logger.warning(f"Upload of {len(described)}: descriptors {t1 - t0:.1f}s, alerts {alerts_time:.1f}s, DB {t2 - t1 - alerts_time:.1f}s")
-        # ------ Creating a summary ------
-        summary = {"name":library.name, "loaded":len(described), "duplicates":len(duplicates), "invalid":len(rejections), "out_of_scope":out_of_scope, "rejections":(duplicates + rejections)[:MAX_SHOWN_REJECTIONS]}
-        # ------ Keeping summary in screen ------
-        session["upload_summary"] = summary
+        # ------ Keeping summary in screen: only the first examples travel in the 4 KB cookie ------
+        counts["rejections"] = counts["rejections"][:MAX_SHOWN_REJECTIONS]
+        session["upload_summary"] = {"name": library.name, **counts}
         return redirect(url_for('libraries'))
     else:
         pagination=user_libraries(None)
@@ -1046,11 +999,11 @@ def deduplicate(valid):
             seen[canonical] = number
     return unique, duplicates
 
-def read_smi(text):
+def read_smi(text, start=1):
     """Reads text from .smi: one SMILES per line, optionally followed by a name.
     Blank lines and lines starting with # are skipped."""
     compounds = []
-    for number, line in enumerate(text.splitlines(), start = 1):
+    for number, line in enumerate(text.splitlines(), start=start):
         # ------ Line numbers include blank lines and comments, so they match the user's editor ------
         line = line.strip()
         if not line:
@@ -1122,6 +1075,59 @@ def evaluate(compound, profile):
     else:
         reason = None
     return passed, violations, reason
+
+# ------ Helper: validates, describes and saves one batch of lines into a library ------
+def save_batch(library, text, start, patterns):
+    """Saves the compounds of a batch of lines (or of a whole file) into the library.
+    start is the file line number of the first line, so reasons point to the right line.
+    It does not commit: the caller decides when the batch is saved."""
+    compounds = read_smi(text, start)
+    valid, rejections = validate_compounds(compounds)
+    unique, duplicates = deduplicate(valid)
+    loaded = 0
+    out_of_scope = 0
+    for number, canonical, name, mol in unique:
+        # ------ Search for or create a compound ------
+        compound = db.session.scalar(select(Compound).filter_by(canonical_smiles=canonical))
+        if compound is None:
+            # ------ Descriptors only for new compounds: existing ones already have them ------
+            compound = Compound(
+                canonical_smiles=canonical,
+                name=name,
+                **describe(mol)
+            )
+            db.session.add(compound)
+            db.session.flush()
+            # ------ New compounds in scope: record their structural alerts ------
+            if not compound.out_of_scope:
+                for alert_id, match_count in match_alerts(mol, patterns):
+                    compound_alert = CompoundAlert(
+                        compound_id=compound.id,
+                        alert_id=alert_id,
+                        match_count=match_count
+                    )
+                    db.session.add(compound_alert)
+        # ------ Already linked by an earlier batch of the same file: deduplicate only sees its own batch ------
+        if db.session.get(CompoundLibrary, (library.id, compound.id)) is not None:
+            duplicates.append({"line": number, "reason": "Duplicate of an earlier line"})
+            continue
+        if compound.out_of_scope:
+            out_of_scope += 1
+        # ------ Link to library. Several libraries, not several compounds ------
+        compound_library = CompoundLibrary(
+            library_id=library.id,
+            compound_id=compound.id,
+            external_code=name
+        )
+        db.session.add(compound_library)
+        loaded += 1
+    return {
+        "loaded": loaded,
+        "duplicates": len(duplicates),
+        "invalid": len(rejections),
+        "out_of_scope": out_of_scope,
+        "rejections": duplicates + rejections,
+    }
 
 # ------ Helper: returns all structural alerts and return a list ------
 def compile_alerts():
