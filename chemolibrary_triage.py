@@ -8,14 +8,13 @@ from types import SimpleNamespace
 
 # ----- FLASK APP ------
 import click
-from flask import Flask, abort, flash, redirect, render_template, request, url_for, session
+from flask import Flask, abort, flash, redirect, render_template, request, url_for, session, jsonify
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from flask_wtf import CSRFProtect, FlaskForm
 from flask_wtf.file import FileAllowed, FileField, FileRequired
 from werkzeug.security import check_password_hash, generate_password_hash
 from wtforms import (BooleanField, DecimalField, EmailField, IntegerField, PasswordField, SelectField, StringField, TextAreaField)
 from wtforms.validators import (DataRequired, EqualTo, InputRequired, Length, NumberRange, Optional, Regexp, ValidationError)
-
 # ----- DATABASE -----
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -396,10 +395,51 @@ def make_curator(email):
     click.echo(f"{user.email} is now a curator.")
 # ------ END AUTHENTICATION ------
 
-class LibraryForm(FlaskForm):
+# ------ LIBRARY FORM ------
+# ------ New class - JS integration ------
+class LibraryStartForm(FlaskForm):
     name = StringField("Name", validators=[DataRequired(), Length(max=150)])
     description = TextAreaField("Description")
+
+# ------ Inherits from LibraryStartForm - Only adds a file ------
+class LibraryForm(LibraryStartForm):
     file = FileField("File", validators=[FileRequired(), FileAllowed(["smi", "csv", "txt"])])
+
+@app.route("/libraries/start", methods=['POST'])
+@login_required
+def start_library():
+    form = LibraryStartForm()
+    if not form.validate_on_submit():
+        return jsonify(errors=form.errors),400
+    library = Library(
+        user_id=current_user.id,
+        name=form.name.data,
+        description=form.description.data
+    )
+    db.session.add(library)
+    db.session.commit()
+    session["upload_summary"]={"name":library.name, "loaded":0, "duplicates":0, "invalid":0, "out_of_scope":0, "rejections":[]}
+    return jsonify(id=library.id)
+
+@app.route('/libraries/<int:id>/batch', methods=['POST'])
+@login_required
+def upload_batch(id):
+    library = db.get_or_404(Library, id)
+    if library.user_id != current_user.id:
+        abort(404)
+    text = request.form.get("text", "")
+    start = request.form.get("start", 1, type=int)
+    counts = save_batch(library, text, start, compile_alerts())
+    db.session.commit()
+    summary = session["upload_summary"]
+    summary["loaded"]+=counts["loaded"] 
+    summary["duplicates"] +=counts["duplicates"]
+    summary["invalid"]+=counts["invalid"]
+    summary["out_of_scope"]+=counts["out_of_scope"]
+    summary["rejections"] = (summary["rejections"]+counts["rejections"])[:MAX_SHOWN_REJECTIONS]
+    session["upload_summary"]=summary
+    return jsonify(counts)
+# ------ END ------
 
 class FilterProfileForm(FlaskForm):
     name = StringField("Name", validators=[DataRequired(), Length(max=100)])

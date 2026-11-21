@@ -127,7 +127,7 @@ Libraries
 
     {# Without enctype, request.files arrives empty. novalidate turns off the
        browser's validation bubbles so the server's errors are shown instead. #}
-    <form class="form-stack" method="post" action="{{ url_for('upload_libraries') }}" enctype="multipart/form-data" novalidate>
+    <form class="form-stack" method="post" action="{{ url_for('upload_libraries') }}" enctype="multipart/form-data" novalidate id="upload-form">
       {{ form.hidden_tag() }}
 
       {{ form_field(form.name, placeholder="e.g. Kinase inhibitors, batch 3") }}
@@ -153,9 +153,22 @@ Libraries
       </div>
 
       <button type="submit" class="button button--primary button--block">Upload and validate</button>
+      <div class="progress" id="upload-progress" hidden>
+        <div class="progress-header">
+          <span>Uploading</span>
+          <span id="progress-text">0 of 0 lines</span>
+        </div>
+        <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="fill" style="width: 0%"></div>
+        </div>
+      </div>
     </form>
   </section>
 
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='upload.js') }}"></script>
 {% endblock %}
