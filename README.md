@@ -86,13 +86,51 @@ Una aclaración que me importa, porque es la que me permite dormir tranquilo: **
 > La tercera es una decisión: Flask con Jinja2 ya cubre front y back, y agregar una segunda aplicación con su propio build no aportaría nada a lo que se evalúa. 
 > La interactividad que el proyecto necesita (ordenar la tabla, filtrar, barra de progreso) se resuelve con unas pocas líneas de JavaScript.
 
+### Rendimiento: carga por lotes
+
+Cargar una quimioteca es la operación más costosa del sistema: cada SMILES se valida, se canonicaliza, se le calculan sus descriptores y se compara contra las 480 alertas PAINS. Al medirla con 500 compuestos, el mismo código se comportó muy distinto según el entorno:
+
+| Entorno | Compuestos | Tiempo |
+|---|---|---|
+| Local (MacBook Air) | 500 | 2 s |
+| Render, plan gratuito (0,1 CPU) + Neon (misma región, Ohio) | 500 | ~30 s, justo en el límite de Gunicorn (30 s) |
+
+Para saber dónde se iba el tiempo, se midió cada etapa en producción:
+
+| Etapa | Tiempo | Proporción |
+|---|---|---|
+| Descriptores (RDKit) | 10,6 s | 38 % |
+| Alertas estructurales (480 patrones × 500 moléculas, RDKit) | 9,4 s | 33 % |
+| Base de datos (consultas a Neon) | 8,1 s | 29 % |
+| **Total** | **28,1 s** | |
+
+El 71 % del tiempo es cálculo químico con una décima de CPU, no la base de datos. Optimizar solo las consultas habría ahorrado unos 7 segundos, y una biblioteca de 1000 compuestos igual habría superado el límite. Por eso se eligió **dividir el trabajo en lotes**:
+
+1. El navegador lee el archivo y lo divide en tramos de 100 líneas (JavaScript, `static/upload.js`).
+2. `POST /libraries/start` crea la biblioteca vacía.
+3. Cada tramo se envía a `POST /libraries/<id>/batch`, que lo procesa y hace su propio `commit`. Los números de línea se conservan, así que los motivos de rechazo siguen apuntando a la línea real del archivo.
+4. El resumen se acumula en la sesión, y al terminar se muestra como siempre. Una barra de progreso informa el avance.
+
+Resultado en producción, con 1000 compuestos nuevos (10 lotes de 100 líneas y uno final de 3):
+
+| Medición | Valor |
+|---|---|
+| Tiempo por lote | entre 5,09 s y 7,10 s (promedio ≈ 6,1 s) |
+| Lote más lento comparado con el límite de 30 s | 24 % |
+| Total | ≈ 61 s |
+
+Ambos criterios de RNF-01 se cumplen: cada lote de 100 responde en menos de 30 s, y 500 compuestos se procesan en menos de 5 minutos.
+
+> [!NOTE]
+> Se descartó una cola de tareas (Celery o RQ) porque requiere un proceso *worker* y un *broker* como Redis: dos servicios más que desplegar y mantener. Para el volumen del proyecto, los lotes resuelven el problema. Sin JavaScript, el formulario sigue funcionando y sube el archivo en una sola petición.
+
 ### Límites declarados
  
 Todo software de quimioinformática tiene un límite. Los de este están documentados y se comunican al usuario, en lugar de fallar en silencio:
  
 1. **Máximo 200 átomos pesados.** Por encima, el compuesto se carga pero se marca como fuera de alcance y no se le calculan descriptores. (La ciclosporina tiene 85, así que entra holgada.)
 2. **LogP es un valor calculado**, no experimental. Algoritmos distintos dan resultados distintos para la misma molécula.
-3. **Las alertas PAINS son heurísticas.** Hay fármacos aprobados que contienen subestructuras marcadas.
+3. **Las alertas PAINS son heurísticas.** Hay fármacos aprobados que contienen subestructuras marcadas, y el sistema las detecta: la **levodopa** y la **entacapona** (Parkinson) activan `catechol_A(92)`, y el **epalrestat** (neuropatía diabética) activa `ene_rhod_A(235)`. Por eso el curador puede desactivar una alerta, y cada descarte por alerta queda escrito con su nombre.
 4. **El sistema no predice ADME.** Clasifica según criterios explícitos y guarda cuáles fueron.
 
 ### Fuera de alcance de esta entrega
@@ -106,15 +144,32 @@ Todo software de quimioinformática tiene un límite. Los de este están documen
 
 ## Decisiones de diseño
 
-**Alerts:**
+**Alertas estructurales**
 
-1. Las alertas no suman violaciones. violations sigue contando solo reglas fisicoquímicas (MW, LogP, otros…). Una alerta es otro tipo de problema, y mezclarlos haría que allowed_violations perdiera su sentido.
-2. Solo cuentan las alertas activas, porque el curador puede desactivar una alerta que considere demasiado estricta.
-3. `evaluate` sigue sin consultar la base directamente. Las alertas le llegan a través del compuesto.
+1. Las alertas no suman violaciones. `violations` sigue contando solo reglas fisicoquímicas (MW, LogP, etc.). Una alerta es otro tipo de problema, y mezclarlos haría que `allowed_violations` perdiera su sentido.
+2. Una alerta de severidad `discard` rechaza el compuesto sin importar cuántas violaciones tolere el perfil. Una de severidad `warning` solo queda escrita en el motivo.
+3. Solo cuentan las alertas activas, porque el curador puede desactivar una alerta que considere demasiado estricta.
+4. `evaluate` no consulta la base directamente. Las alertas le llegan a través del compuesto.
+5. Los 480 patrones PAINS se cargan desde el archivo que trae RDKit (`Data/Pains/wehi_pains.csv`). Contienen hidrógenos explícitos, por eso se compilan con `mergeHs=True`. Así compilados, dan los mismos resultados que el catálogo PAINS interno de RDKit sobre sus 10.000 moléculas de prueba. BRENK todavía no está cargado: RDKit no lo incluye como texto SMARTS.
+6. La tabla `compound_alert` es un dato derivado. Se calcula una sola vez, al cargar el compuesto, y no durante el cribado. Registra todas las alertas, incluso las inactivas, para que activar o desactivar una no obligue a recalcular nada. El comando `rebuild-alerts` la reconstruye por completo y puede ejecutarse las veces que haga falta.
 
-**Borrar:**
+**Bibliotecas y compuestos**
 
-1. Al borrar una librería, no se borran los compuestos. Justamente, por eso existe al deduplicación de compuestos. Todos son reutilizables.
+1. Al borrar una biblioteca no se borran sus compuestos. Para eso existe la deduplicación por SMILES canónico: un compuesto puede estar en varias bibliotecas y se reutiliza. Lo que sí se borra, en cascada, son sus vínculos y sus cribados.
+2. Los descriptores y las alertas se calculan solo para los compuestos nuevos. Si un compuesto ya existe en la base, se reutiliza tal cual.
+3. Con la carga por lotes, cada lote se confirma por separado. Si un lote falla, los anteriores quedan guardados y el usuario ve en qué línea se detuvo la carga; desde ahí puede borrar la biblioteca e intentar de nuevo.
+
+**Cribado y trazabilidad**
+
+1. Cada cribado guarda sus resultados en el momento de ejecutarse y no se recalcula después. Si una alerta se desactiva, los cribados anteriores conservan la decisión que se tomó con las reglas de ese momento.
+2. Limitación conocida: el cribado guarda el identificador del perfil, no una copia de sus umbrales. Si el perfil se edita después, no queda registrada la configuración exacta que se aplicó. Una mejora posible es guardar esa configuración en una columna JSONB del cribado.
+
+**Seguridad**
+
+1. Los permisos se comprueban en el servidor, en cada ruta. Ocultar un botón en la interfaz no es seguridad: un formulario se puede enviar a mano.
+2. Un recurso ajeno (una biblioteca o un cribado de otro usuario) responde **404** y no 403, para no confirmar que existe. Una página reservada al curador responde **403**, porque su existencia no es un secreto.
+3. Un curador no puede desactivar su propia cuenta ni cambiar su propio rol, para que el sistema nunca quede sin nadie que lo administre.
+
 ---
 
 ## Autor
