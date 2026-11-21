@@ -701,6 +701,8 @@ def upload_libraries():
     if form.validate_on_submit():
         uploaded_file = form.file.data
         # ------ Some files require another utf-8, like Windows devices ------
+        import time
+        t0 = time.perf_counter() # TP
         text = uploaded_file.read().decode("utf-8-sig")
         compounds = read_smi(text)
         valid, rejections = validate_compounds(compounds)
@@ -714,6 +716,7 @@ def upload_libraries():
                 out_of_scope += 1
             described.append((number, canonical, name, descriptors, mol))
         # ------ Create a library ------
+        t1 = time.perf_counter() # TP
         library = Library(
             user_id=current_user.id,
             name=form.name.data,
@@ -721,6 +724,7 @@ def upload_libraries():
         )
         db.session.add(library)
         db.session.flush()
+        alerts_time = 0 # TP
         # ------ Search for or create a compound ------
         for number, canonical, name, descriptors, mol in described:
             compound = db.session.scalar(select(Compound).filter_by(canonical_smiles=canonical))
@@ -734,7 +738,9 @@ def upload_libraries():
                 db.session.flush()
                 # ------ New compounds in scope: record their structural alerts ------
                 if not compound.out_of_scope:
+                    ta = time.perf_counter()
                     matches = match_alerts(mol, patterns)
+                    alerts_time+=time.perf_counter()-ta
                     for alert_id, match_count in matches:
                         compound_alert=CompoundAlert(
                             compound_id=compound.id,
@@ -750,6 +756,8 @@ def upload_libraries():
             )
             db.session.add(compound_library)
         db.session.commit()
+        t2 = time.perf_counter() # TP
+        app.logger.warning(f"Upload of {len(described)}: descriptors {t1 - t0:.1f}s, alerts {alerts_time:.1f}s, DB {t2 - t1 - alerts_time:.1f}s")
         # ------ Creating a summary ------
         summary = {"name":library.name, "loaded":len(described), "duplicates":len(duplicates), "invalid":len(rejections), "out_of_scope":out_of_scope, "rejections":(duplicates + rejections)[:MAX_SHOWN_REJECTIONS]}
         # ------ Keeping summary in screen ------
