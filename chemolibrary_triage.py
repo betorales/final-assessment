@@ -518,7 +518,40 @@ def change_password():
 @app.route('/users')
 @curator_required
 def users():
-    return redirect(url_for('profile'))
+    # Select users from AppUser
+    query=select(AppUser).order_by(AppUser.name)
+    q = request.args.get("q", "").strip() or None
+    if q:
+        query = query.where(or_(AppUser.name.ilike(f"%{q}%"), AppUser.email.ilike(f"%{q}%")))
+    pagination=db.paginate(query, per_page=20)
+    return render_template('users.html', pagination=pagination, q=q)
+
+@app.route('/users/<int:id>/toggle', methods=['POST'])
+@curator_required
+def toggle_user(id):
+    user=db.get_or_404(AppUser, id)
+    if user.id==current_user.id:
+        flash("You can’t deactivate your own account")
+        return redirect(url_for('users'))
+    user.is_active=not user.is_active
+    db.session.commit()
+    state = "activated" if user.is_active else "deactivated"
+    flash(f"The following account {user.name} has been {state}", "success")
+    return redirect(url_for('users')) 
+
+
+@app.route('/users/<int:id>/role', methods=['POST'])
+@curator_required
+def change_role(id):
+    user=db.get_or_404(AppUser, id)
+    if user.id==current_user.id:
+        flash("You can't reassign your role")
+        return redirect(url_for('users'))
+    new_role="researcher" if user.role.name == "curator" else "curator"
+    user.role = db.session.scalar(select(Role).filter_by(name=new_role))
+    db.session.commit()
+    flash(f"The user {user.name} has changed role to {new_role}", 'success')
+    return redirect(url_for('users'))
 
 class AccountForm(FlaskForm):
     name = StringField("Name", validators=[DataRequired(), Length(max=100)])
@@ -674,7 +707,7 @@ def upload_libraries():
         unique, duplicates = deduplicate(valid)
         described = []
         out_of_scope = 0
-        patterns = compile_alerts() # Checked
+        patterns = compile_alerts()
         for  number, canonical, name, mol in unique:
             descriptors = describe(mol)
             if descriptors["heavy_atoms"] > MAX_HEAVY_ATOMS:

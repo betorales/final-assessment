@@ -1,0 +1,98 @@
+{% extends 'base.html'%}
+
+{% block title %}
+Users
+{% endblock %}
+
+{% block nav %}
+{% include 'nav.html'%}
+{% endblock %}
+
+{% block content %}
+
+{% from "_macros.html" import form_field, pagination_nav %}
+
+<div class="page-header">
+   <div class="page-header-text">
+     <h1 class="display">Users</h1>
+   </div>
+ </div>
+
+ {% if is_curator %}
+<nav class="tabs" aria-label="Account sections">
+  <a href="{{ url_for('profile') }}">My profile</a>
+  <a href="{{ url_for('users') }}" aria-current="page">User management</a>
+</nav>
+{% endif %}
+
+<section class="card" aria-labelledby="history-title">
+
+   <div class="card-header">
+     <h2 id="users-title" class="subheading">Users</h2>
+     <form class="search-box" role="search" method="get" action="{{ url_for('users') }}">
+       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path></svg>
+       <label class="sr-only" for="q">Search users</label>
+       <input id="q" name="q" type="search" value="{{ q or '' }}" placeholder="Search name or email">
+     </form>
+   </div>
+ 
+   {% if pagination.items %}
+   <table class="table" role="table" aria-labelledby="history-title">
+     <thead role="rowgroup">
+       <tr role="row">
+         <th role="columnheader" scope="col">Name</th>
+         <th role="columnheader" scope="col">Email</th>
+         <th role="columnheader" scope="col">Institution</th>
+         <th role="columnheader" scope="col" class="col-num">Role</th>
+         <th role="columnheader" scope="col" class="col-num">Status</th>
+         <th role="columnheader" scope="col">Joined</th>
+         <th role="columnheader" scope="col">Actions</th>
+       </tr>
+     </thead>
+     <tbody role="rowgroup">
+       {% for u in pagination.items %}
+       <tr role="row" {% if not u.is_active %} class="row-inactive"{% endif %}>
+         <td role="cell" class="cell-title">{{ u.name }} {% if u.id == current_user.id %}(You) {% endif %}</td>
+         <td role="cell" data-label="Email">{{ u.email }}</td>
+         <td role="cell" data-label="Institution">{{ u.institution or "-" }}</td>
+         <td role="cell" class="col-num" data-label="Role"><span class="data role-badge">{{ u.role.name }}</span></td>
+         <td role="cell" class="col-num" data-label="Status" ><span class="data">{{ "Active" if u.is_active else "Inactive" }}</span></td>
+         <td role="cell" data-label="Joined">
+           <time datetime="{{ u.created_at.isoformat() }}">{{ u.created_at.strftime('%d %b %Y, %H:%M') }}</time>
+         </td>
+         <td role="cell" class="cell-actions">
+           <div class="row-actions">
+             <form method="post" action="{{ url_for('toggle_user', id=u.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="button">{{ "Deactivate" if u.is_active else "Activate" }}<span class="sr-only"> {{ u.name }}</span></button>
+              </form>
+              <form method="post" action="{{ url_for('change_role', id=u.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="button">{{ "Make researcher" if u.role.name=="curator" else "Make curator" }}<span class="sr-only"> {{ u.role.name }}</span></button>
+               </form>
+           </div>
+         </td>
+       </tr>
+       {% endfor %}
+     </tbody>
+   </table>
+ 
+   <div class="card-footer">
+     <span>Showing {{ pagination.items|length }} of {{ pagination.total }}</span>
+     {{ pagination_nav(pagination, 'users', q=q) }}
+   </div>
+ 
+   {% else %}
+   <div class="empty-state">
+     {% if q %}
+     <p class="title">No users match... “{{ q }}”</p>
+     <a href="{{ url_for('users') }}">See the full users list</a>
+     {% else %}
+     <p class="title">No users yet</p>
+     {% endif %}
+   </div>
+   {% endif %}
+ 
+ </section>
+
+{% endblock %}
