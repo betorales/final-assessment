@@ -18,12 +18,20 @@ Screening
      <h1 class="display">{{ screening.library.name }}</h1>
      <p class="text-secondary">{{screening.filter_profile.name}}</p>
      <p class="text-secondary"> {{ screening.created_at.strftime('%d %b %Y, %H:%M') }} </p>
+     {% if screening.user_id != current_user.id %}
+     <p class="text-secondary">Run by {{ screening.user.name }}</p>
+     {% endif %}
+   </div>
+   <div class="actions">
+     <a class="button" href="{{ url_for('export_screening', id=screening.id) }}">Export CSV</a>
    </div>
  </div>
 
 <dl class="stats">
    <div><dt>Evaluated</dt><dd>{{ screening.total_evaluated }}</dd></div>
-   <div><dt>Passed</dt><dd>{{ screening.total_passed }}</dd></div>
+   {# ------ RF-15: share of approved compounds; an empty library has nothing to divide ------ #}
+   {% set percent = (screening.total_passed / screening.total_evaluated * 100)|round(1) if screening.total_evaluated else 0 %}
+   <div><dt>Passed</dt><dd>{{ screening.total_passed }} <span class="caption">({{ percent }} %)</span></dd></div>
    <div><dt>Rejected</dt><dd>{{ screening.total_evaluated - screening.total_passed }}</dd></div>
 </dl>
 

@@ -1,4 +1,5 @@
 import contextlib
+import csv
 import io
 import os
 from datetime import datetime, timedelta, timezone
@@ -8,7 +9,7 @@ from types import SimpleNamespace
 
 # ----- FLASK APP ------
 import click
-from flask import Flask, abort, flash, redirect, render_template, request, url_for, session, jsonify
+from flask import Flask, abort, flash, redirect, render_template, request, url_for, session, jsonify, Response
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from flask_wtf import CSRFProtect, FlaskForm
 from flask_wtf.file import FileAllowed, FileField, FileRequired
@@ -239,6 +240,7 @@ class Screening(db.Model):
     # ------ Allows to retrieve everything from these tables (LEFT OUTER JOIN) ------
     library = db.relationship("Library", lazy="joined")
     filter_profile = db.relationship("FilterProfile", lazy="joined")
+    user = db.relationship("AppUser", lazy="joined")
 # ------ END SCREENING TABLE ------
 
 # ------ 10. SCREENING RESULT ------
@@ -261,6 +263,7 @@ class ScreeningResult(db.Model):
 PASSWORD_RULES = [
     Length(min=8, message="Must be at least 8 characters long."),
     Regexp(r".*\d", message="Must include at least one number."),
+    Regexp(r".*[A-Za-z]", message="Must include at least one letter."),
 ]
 
 @login_manager.user_loader
@@ -646,8 +649,10 @@ def screenings():
     # ------ Adding options to library dropdown in Screenings view ------
     available_libraries = db.session.scalars(select(Library).filter_by(user_id=current_user.id).order_by(Library.name)).all()
     official, own = visible_profiles()
-    # ------ Show user's screenings ------
-    query=select(Screening).filter_by(user_id=current_user.id).order_by(Screening.created_at.desc())
+    # ------ Show screenings: a curator sees everyone's (RF-17), a researcher only their own ------
+    query = select(Screening).order_by(Screening.created_at.desc())
+    if not is_curator():
+        query = query.where(Screening.user_id == current_user.id)
     q = request.args.get("q", "").strip() or None
     if q:
         query = query.join(Screening.library).join(Screening.filter_profile).where(
@@ -709,12 +714,54 @@ class ScreeningForm(FlaskForm):
     library = SelectField("Library", coerce=int_or_none, validators=[DataRequired()])
     filter_profile = SelectField("Filter profile", coerce=int_or_none, validators=[DataRequired()])
 
+# ------ A screening is visible to its owner and to curators; anyone else gets 404 ------
+def screening_or_404(id):
+    screening = db.get_or_404(Screening, id)
+    if screening.user_id != current_user.id and not is_curator():
+        abort(404)
+    return screening
+
+# ------ Spreadsheet programs run cells that start with = + - @ as formulas: prefix them with ' ------
+def csv_safe(value):
+    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@"):
+        return "'" + value
+    return value
+
+# ------ RF-16: download every result of a screening as CSV, with the same columns as the table ------
+@app.route('/screenings/<int:id>/export.csv')
+@login_required
+def export_screening(id):
+    screening = screening_or_404(id)
+    results = db.session.scalars(
+        select(ScreeningResult).filter_by(screening_id=screening.id).order_by(ScreeningResult.compound_id)
+    ).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Compound", "InChIKey", "Canonical SMILES", "MW", "LogP", "HBD", "HBA",
+                     "TPSA", "RotB", "QED", "Status", "Violations", "Reason"])
+    for result in results:
+        compound = result.compound
+        if compound.out_of_scope:
+            status = "Out of scope"
+        elif result.passed:
+            status = "Passed"
+        else:
+            status = "Rejected"
+        writer.writerow([csv_safe(compound.name), compound.inchikey, compound.canonical_smiles,
+                         compound.molecular_weight, compound.clogp, compound.hbd, compound.hba,
+                         compound.tpsa, compound.rotatable_bonds, compound.qed,
+                         status, result.violations, csv_safe(result.reason)])
+    # ------ The BOM (\ufeff) lets spreadsheet programs read accents and symbols as UTF-8 ------
+    return Response(
+        "\ufeff" + output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="screening-{screening.id}.csv"'},
+    )
+
 @app.route('/screenings/<int:id>')
 @login_required
 def see_screening(id):
-    screening = db.get_or_404(Screening, id)
-    if screening.user_id != current_user.id:
-        abort(404)
+    screening = screening_or_404(id)
 
     query=select(ScreeningResult).filter_by(screening_id=screening.id).order_by(ScreeningResult.compound_id)
     pagination = db.paginate(query, per_page=20)
@@ -1211,6 +1258,26 @@ def preview_pattern(smarts):
         if mol.HasSubstructMatch(pattern):
             matches.append(compound.name)
     return {"matches": matches, "total": len(compounds)}
+
+# ------ RNF-11: own error pages. Readable messages, no technical details; Flask logs the exception itself ------
+ERROR_MESSAGES = {
+    400: ("Bad request", "The request could not be processed. Go back and try again."),
+    403: ("Access denied", "Your account does not have permission to open this page."),
+    404: ("Page not found", "The page does not exist, or it is not available to your account."),
+    500: ("Something went wrong", "An unexpected error occurred and it has been recorded. Please try again later."),
+}
+
+@app.errorhandler(400)
+@app.errorhandler(403)
+@app.errorhandler(404)
+@app.errorhandler(500)
+def error_page(error):
+    code = getattr(error, "code", 500)
+    if code == 500:
+        # ------ Discard what the failed request left half done, so the error page can still use the database ------
+        db.session.rollback()
+    title, message = ERROR_MESSAGES.get(code, ERROR_MESSAGES[500])
+    return render_template("error.html", code=code, title=title, message=message), code
 
 if __name__ == "__main__":
     app.run(debug=True)

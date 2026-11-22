@@ -58,6 +58,7 @@ Screenings
       <tr role="row">
         <th role="columnheader" scope="col">Library</th>
         <th role="columnheader" scope="col">Profile</th>
+        {% if is_curator %}<th role="columnheader" scope="col">User</th>{% endif %}
         <th role="columnheader" scope="col">Date</th>
         <th role="columnheader" scope="col" class="col-num">Evaluated</th>
         <th role="columnheader" scope="col" class="col-num">Passed</th>
@@ -69,6 +70,7 @@ Screenings
       <tr role="row">
         <td role="cell" class="cell-title">{{ s.library.name }}</td>
         <td role="cell" data-label="Profile">{{ s.filter_profile.name }}</td>
+        {% if is_curator %}<td role="cell" data-label="User">{{ s.user.name }}</td>{% endif %}
         <td role="cell" data-label="Date">
           <time datetime="{{ s.created_at.isoformat() }}">{{ s.created_at.strftime('%d %b %Y, %H:%M') }}</time>
         </td>
