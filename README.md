@@ -2,7 +2,7 @@
 
 > Plataforma web para el triaje de quimiotecas con perfiles de filtro configurables, que explica cada uno de sus descartes. 
 > 
-> Flask · PostgreSQL · RDKit
+> Flask · PostgreSQL · RDKit · JavaScript
 
 ## Idea: de dónde nace
 
