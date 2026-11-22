@@ -62,6 +62,10 @@ MAX_HEAVY_ATOMS = 200
 # Shown rejections
 MAX_SHOWN_REJECTIONS = 10
 
+# Colors
+DISCARD_COLOR = (0.96, 0.69, 0.52) # orange, same family as --state-fail in styles.css
+WARNING_COLOR = (1.0, 0.87, 0.6) # amber
+
 # ------ TABLES ------
 # CHECK constraints go in __table_args__ and need a name: Flask-Migrate skips
 # the ones written inside a column.
@@ -604,7 +608,6 @@ class AccountForm(FlaskForm):
         Regexp(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", message="Enter a valid email address."),
     ])
     institution = StringField("Institution", filters=[empty_to_none], validators=[Optional(), Length(max=150)])
-
 
 class PasswordForm(FlaskForm):
     current_password = PasswordField("Current password", validators=[DataRequired()])
@@ -1162,6 +1165,59 @@ def evaluate(compound, profile):
     else:
         reason = None
     return passed, violations, reason
+
+# ------ Draw a compound route ------
+@app.route("/compounds/<int:id>/structure.svg", methods=['GET'])
+@login_required
+def compound_structure(id):
+    from rdkit import Chem
+    compound = db.get_or_404(Compound, id)
+    if not is_curator():
+        link = db.session.scalar(select(CompoundLibrary).join(Library).where(CompoundLibrary.compound_id==compound.id, Library.user_id==current_user.id))
+        if link is None:
+            abort(404)
+    if compound.out_of_scope:
+        abort(404)
+    mol = Chem.MolFromSmiles(compound.canonical_smiles)
+    atom_colors = alert_colors(mol, compound.alerts)
+    svg = draw_structure(mol, atom_colors)
+    return Response(svg, mimetype="image/svg+xml", headers={"Cache-Control": "private, max-age=600"})
+
+# ------ Helper: Draw a compound ------
+def draw_structure(mol, atom_colors):
+    from rdkit.Chem.Draw import rdMolDraw2D
+
+    drawer = rdMolDraw2D.MolDraw2DSVG(300, 200) # width and height in pixels
+    drawer.drawOptions().clearBackground = False # transparent background
+    # ------ Paint a bond when both of its atoms are painted ------
+    bond_colors = {
+        bond.GetIdx(): atom_colors[bond.GetBeginAtomIdx()]
+        for bond in mol.GetBonds()
+        if bond.GetBeginAtomIdx() in atom_colors and bond.GetEndAtomIdx() in atom_colors
+    }
+    rdMolDraw2D.PrepareAndDrawMolecule(
+        drawer, mol,
+        highlightAtoms=list(atom_colors), highlightAtomColors=atom_colors,
+        highlightBonds=list(bond_colors), highlightBondColors=bond_colors,
+    )
+    drawer.FinishDrawing()
+    svg = drawer.GetDrawingText() # the drawing, as SVG text
+    return svg
+
+# ------ Helper: Atom colors for the active alerts ------
+def alert_colors(mol, alerts):
+    from rdkit import Chem
+
+    colors = {}
+    for alert in alerts:
+        if alert.is_active:
+            pattern = Chem.MolFromSmarts(alert.smarts, mergeHs=True)
+            color = WARNING_COLOR if alert.severity == "warning" else DISCARD_COLOR
+            for match in mol.GetSubstructMatches(pattern):
+                for index in match:
+                    if colors.get(index) != DISCARD_COLOR:
+                        colors[index] = color
+    return colors
 
 # ------ Helper: validates, describes and saves one batch of lines into a library ------
 def save_batch(library, text, start, patterns):

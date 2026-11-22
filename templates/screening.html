@@ -40,6 +40,7 @@ Screening
      <table class="results-table" aria-label="Results">
        <thead>
          <tr>
+            <th scope="col">Structure</th>
            <th scope="col">Compound</th>
            <th scope="col" class="col-num">MW</th>
            <th scope="col" class="col-num">LogP</th>
@@ -54,6 +55,11 @@ Screening
        <tbody>
          {% for r in pagination.items %}
          <tr>
+          <td class="cell-structure">
+            {% if not r.compound.out_of_scope %}
+            <img src="{{ url_for('compound_structure', id=r.compound.id) }}" alt="Structure of {{ r.compound.name }}" width="84" height="56" loading="lazy">
+            {% else %}—{% endif %}
+          </td>
            <td class="cell-compound">
              <div class="compound">
                <span class="name">{{ r.compound.name }}</span>

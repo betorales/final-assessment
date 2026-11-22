@@ -119,7 +119,7 @@ Resultado en producción, con 1000 compuestos nuevos (10 lotes de 100 líneas y 
 | Lote más lento comparado con el límite de 30 s | 24 % |
 | Total | ≈ 61 s |
 
-Ambos criterios de RNF-01 se cumplen: cada lote de 100 responde en menos de 30 s, y 500 compuestos se procesan en menos de 5 minutos.
+Ambos criterios de un requisito no funcional se cumplen: cada lote de 100 responde en menos de 30 s, y 500 compuestos se procesan en menos de 5 minutos.
 
 > [!NOTE]
 > Se descartó una cola de tareas (Celery o RQ) porque requiere un proceso *worker* y un *broker* como Redis: dos servicios más que desplegar y mantener. Para el volumen del proyecto, los lotes resuelven el problema. Sin JavaScript, el formulario sigue funcionando y sube el archivo en una sola petición.
