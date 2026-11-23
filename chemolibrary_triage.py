@@ -1222,7 +1222,7 @@ def alert_colors(mol, alerts):
                         colors[index] = color
     return colors
 
-# ------ Helper: ------
+# ------ Helper: a library its owner or a curator can open ------
 def library_or_404(id):
     library = db.get_or_404(Library, id)
     if library.user_id != current_user.id and not is_curator():
