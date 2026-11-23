@@ -32,6 +32,9 @@ db_url = os.environ.get("DATABASE_URL", "postgresql+psycopg:///chemotriage")
 # Providers give postgres:// or postgresql://; psycopg 3 needs the +psycopg driver name.
 db_url = db_url.replace("postgres://", "postgresql+psycopg://", 1).replace("postgresql://", "postgresql+psycopg://", 1)
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+# ------ Neon (free plan) suspends the database after ~5 idle minutes and closes open connections ------
+# ------ pool_pre_ping tests each pooled connection before using it and replaces it if it is dead ------
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
 # ------ END ------
 
 # ------ DB CONFIG ------
