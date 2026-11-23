@@ -952,7 +952,7 @@ def toggle_alert(id):
     alert.is_active=not alert.is_active
     db.session.commit()
     state = "activated" if alert.is_active else "deactivated"
-    flash(f"Alert {alert.name }has changed: {state}", "success")
+    flash(f"Alert {alert.name } has changed: {state}", "success")
     return redirect(url_for('alerts'))
 
 def valid_smarts(form, field):
