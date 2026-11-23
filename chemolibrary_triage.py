@@ -766,15 +766,38 @@ def export_screening(id):
         headers={"Content-Disposition": f'attachment; filename="screening-{screening.id}.csv"'},
     )
 
+# ------ Result filters. The key comes from the URL, so only these keys are accepted ------
+RESULT_FILTERS = {
+    "passed":       ("Passed",       [ScreeningResult.passed.is_(True)]),
+    "rejected":     ("Rejected",     [ScreeningResult.passed.is_(False), Compound.out_of_scope.is_(False)]),
+    "out_of_scope": ("Out of scope", [Compound.out_of_scope.is_(True)]),
+}
+
 @app.route('/screenings/<int:id>')
 @login_required
 def see_screening(id):
     screening = screening_or_404(id)
 
-    query=select(ScreeningResult).filter_by(screening_id=screening.id).order_by(ScreeningResult.compound_id)
+        # ------ RF-15: filter by result; an unknown value shows everything ------
+    status = request.args.get("status")
+    if status not in RESULT_FILTERS:
+        status = None
+
+    query = (select(ScreeningResult).join(Compound)
+             .where(ScreeningResult.screening_id == screening.id)
+             .order_by(ScreeningResult.compound_id))
+    if status:
+        query = query.where(*RESULT_FILTERS[status][1])
     pagination = db.paginate(query, per_page=20)
-    
-    return render_template('screening.html', screening=screening, pagination=pagination)
+
+    # ------ One chip per result, with its count (same idea as the alert families) ------
+    counter = (select(func.count()).select_from(ScreeningResult).join(Compound)
+               .where(ScreeningResult.screening_id == screening.id))
+    chips = [dict(key=None, label="All", count=db.session.scalar(counter))]
+    for key, (label, conditions) in RESULT_FILTERS.items():
+        chips.append(dict(key=key, label=label, count=db.session.scalar(counter.where(*conditions))))
+
+    return render_template('screening.html', screening=screening, pagination=pagination,chips=chips, status=status)
 
 # ------ END SCREENINGS ------
 

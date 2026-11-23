@@ -29,11 +29,20 @@ Screening
 
 <dl class="stats">
    <div><dt>Evaluated</dt><dd>{{ screening.total_evaluated }}</dd></div>
-   {# ------ RF-15: share of approved compounds; an empty library has nothing to divide ------ #}
-   {% set percent = (screening.total_passed / screening.total_evaluated * 100)|round(1) if screening.total_evaluated else 0 %}
+   {# ------ Share of approved compounds; an empty library has nothing to divide ------ #}
+   {% set out_of_scope = (chips | selectattr("key", "equalto", "out_of_scope") | first).count %}
    <div><dt>Passed</dt><dd>{{ screening.total_passed }} <span class="caption">({{ percent }} %)</span></dd></div>
-   <div><dt>Rejected</dt><dd>{{ screening.total_evaluated - screening.total_passed }}</dd></div>
+   <div><dt>Rejected</dt><dd>{{ screening.total_evaluated - screening.total_passed - out_of_scope }}</dd></div>
+   {% if out_of_scope %}<div><dt>Out of scope</dt><dd>{{ out_of_scope }}</dd></div>{% endif %}
 </dl>
+
+<nav class="filters" aria-label="Filter by result">
+  {% for c in chips %}
+  <a class="chip" href="{{ url_for('see_screening', id=screening.id, status=c.key) }}"{% if c.key == status %} aria-current="true"{% endif %}>{{ c.label }} <span class="count">{{ c.count }}</span></a>
+  {% endfor %}
+</nav>
+
+{% if pagination.items %}
 
 <div class="table-wrapper">
    <div class="table-scroll">
@@ -95,6 +104,13 @@ Screening
    </div>
  </div>
  
- {{ pagination_nav(pagination, 'see_screening', id=screening.id) }}
+ {% else %}
+ <div class="empty-state">
+   <p class="title">No compounds with this result</p>
+   <a href="{{ url_for('see_screening', id=screening.id) }}">Show all results</a>
+ </div>
+ {% endif %}
+
+ {{ pagination_nav(pagination, 'see_screening', id=screening.id, status=status) }}
 
 {% endblock %}
