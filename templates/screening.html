@@ -11,7 +11,7 @@ Screening
 
 {% block content %}
 
-{% from "_macros.html" import pagination_nav %}
+{% from "_macros.html" import pagination_nav, sort_header %}
 
 <div class="page-header">
    <div class="page-header-text">
@@ -36,9 +36,10 @@ Screening
    {% if out_of_scope %}<div><dt>Out of scope</dt><dd>{{ out_of_scope }}</dd></div>{% endif %}
 </dl>
 
+{# ------ Changing the filter keeps the sort order; dir only travels with a sort ------ #}
 <nav class="filters" aria-label="Filter by result">
   {% for c in chips %}
-  <a class="chip" href="{{ url_for('see_screening', id=screening.id, status=c.key) }}"{% if c.key == status %} aria-current="true"{% endif %}>{{ c.label }} <span class="count">{{ c.count }}</span></a>
+  <a class="chip" href="{{ url_for('see_screening', id=screening.id, status=c.key, sort=sort, dir=direction if sort else None) }}"{% if c.key == status %} aria-current="true"{% endif %}>{{ c.label }} <span class="count">{{ c.count }}</span></a>
   {% endfor %}
 </nav>
 
@@ -50,14 +51,15 @@ Screening
        <thead>
          <tr>
             <th scope="col">Structure</th>
-           <th scope="col">Compound</th>
-           <th scope="col" class="col-num">MW</th>
-           <th scope="col" class="col-num">LogP</th>
-           <th scope="col" class="col-num">HBD</th>
-           <th scope="col" class="col-num">HBA</th>
-           <th scope="col" class="col-num">TPSA</th>
-           <th scope="col" class="col-num">RotB</th>
-           <th scope="col" class="col-num cell-qed">QED</th>
+            {% set here=dict(id=screening.id, status=status) %}
+            {{ sort_header("name", "Compound", sort, direction, "see_screening", classes="", **here) }}
+            {{ sort_header("mw", "MW", sort, direction, "see_screening", **here) }}
+            {{ sort_header("logp", "LogP", sort, direction, "see_screening", **here) }}
+            {{ sort_header("hbd", "HBD", sort, direction, "see_screening", **here) }}
+            {{ sort_header("hba", "HBA", sort, direction, "see_screening", **here) }}
+            {{ sort_header("tpsa", "TPSA", sort, direction, "see_screening", **here) }}
+            {{ sort_header("rotb", "RotB", sort, direction, "see_screening", **here) }}
+            {{ sort_header("qed", "QED", sort, direction, "see_screening", classes="col-num cell-qed", **here) }}
            <th scope="col">Result</th>
          </tr>
        </thead>
@@ -107,10 +109,10 @@ Screening
  {% else %}
  <div class="empty-state">
    <p class="title">No compounds with this result</p>
-   <a href="{{ url_for('see_screening', id=screening.id) }}">Show all results</a>
+   <a href="{{ url_for('see_screening', id=screening.id, sort=sort, dir=direction if sort else None) }}">Show all results</a>
  </div>
  {% endif %}
 
- {{ pagination_nav(pagination, 'see_screening', id=screening.id, status=status) }}
+ {{ pagination_nav(pagination, 'see_screening', id=screening.id, status=status, sort=sort, dir=direction if sort else None) }}
 
 {% endblock %}

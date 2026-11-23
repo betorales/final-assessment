@@ -735,7 +735,7 @@ def csv_safe(value):
         return "'" + value
     return value
 
-# ------ RF-16: download every result of a screening as CSV, with the same columns as the table ------
+# ------ Download every result of a screening as CSV, with the same columns as the table ------
 @app.route('/screenings/<int:id>/export.csv')
 @login_required
 def export_screening(id):
@@ -768,9 +768,21 @@ def export_screening(id):
 
 # ------ Result filters. The key comes from the URL, so only these keys are accepted ------
 RESULT_FILTERS = {
-    "passed":       ("Passed",       [ScreeningResult.passed.is_(True)]),
-    "rejected":     ("Rejected",     [ScreeningResult.passed.is_(False), Compound.out_of_scope.is_(False)]),
+    "passed": ("Passed",[ScreeningResult.passed.is_(True)]),
+    "rejected": ("Rejected", [ScreeningResult.passed.is_(False), Compound.out_of_scope.is_(False)]),
     "out_of_scope": ("Out of scope", [Compound.out_of_scope.is_(True)]),
+}
+
+# ------ Orderable columns ------
+SORT_COLUMNS = {
+    "name": Compound.name, 
+    "mw": Compound.molecular_weight, 
+    "logp": Compound.clogp, 
+    "hbd": Compound.hbd, 
+    "hba": Compound.hba, 
+    "tpsa": Compound.tpsa, 
+    "rotb": Compound.rotatable_bonds, 
+    "qed": Compound.qed
 }
 
 @app.route('/screenings/<int:id>')
@@ -778,16 +790,27 @@ RESULT_FILTERS = {
 def see_screening(id):
     screening = screening_or_404(id)
 
-        # ------ RF-15: filter by result; an unknown value shows everything ------
+    # ------ Filter by result; an unknown value shows everything ------
     status = request.args.get("status")
     if status not in RESULT_FILTERS:
         status = None
 
+    sort = request.args.get("sort")
+    if sort not in SORT_COLUMNS:
+        sort = None
+    direction = "desc" if request.args.get("dir") == "desc" else "asc"
+
     query = (select(ScreeningResult).join(Compound)
-             .where(ScreeningResult.screening_id == screening.id)
-             .order_by(ScreeningResult.compound_id))
+             .where(ScreeningResult.screening_id == screening.id))
+    
     if status:
         query = query.where(*RESULT_FILTERS[status][1])
+    if sort:
+        column = SORT_COLUMNS[sort]
+        order = column.desc() if direction == "desc" else column.asc()
+        query=query.order_by(order.nulls_last(), ScreeningResult.compound_id)
+    else:
+        query=query.order_by(ScreeningResult.compound_id)
     pagination = db.paginate(query, per_page=20)
 
     # ------ One chip per result, with its count (same idea as the alert families) ------
@@ -797,7 +820,7 @@ def see_screening(id):
     for key, (label, conditions) in RESULT_FILTERS.items():
         chips.append(dict(key=key, label=label, count=db.session.scalar(counter.where(*conditions))))
 
-    return render_template('screening.html', screening=screening, pagination=pagination,chips=chips, status=status)
+    return render_template('screening.html', screening=screening, pagination=pagination,chips=chips, status=status, direction=direction, sort=sort)
 
 # ------ END SCREENINGS ------
 

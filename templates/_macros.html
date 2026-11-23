@@ -65,3 +65,11 @@
 </nav>
 {%- endif %}
 {%- endmacro %}
+
+{% macro sort_header(key, label, sort, direction, endpoint, classes="col-num") -%}
+  {%- set active = sort == key -%}
+  {%- set next_dir = "desc" if active and direction == "asc" else "asc" -%}
+  <th scope="col"{% if classes %} class="{{ classes }}"{% endif %}{% if active %} aria-sort="{{ 'ascending' if direction == 'asc' else 'descending' }}"{% endif %}>
+    <a class="sort-link" href="{{ url_for(endpoint, sort=key, dir=next_dir, **kwargs) }}">{{ label }}{% if active %} <span aria-hidden="true">{{ "▲" if direction == "asc" else "▼" }}</span>{% endif %}</a>
+  </th>
+{%- endmacro %}
