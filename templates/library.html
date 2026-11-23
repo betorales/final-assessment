@@ -16,11 +16,16 @@ Library
    <div class="page-header-text">
      <h1 class="display">{{ library.name }}</h1>
      <p>{{ library.uploaded_at.strftime('%d %b %Y, %H:%M') }}</p>
+     {% if library.user_id != current_user.id %}
+     <p class="text-secondary">Uploaded by {{ library.user.name }}</p>
+     {% endif %}
      <p>{{library.description}}</p>
    </div>
+   {% if library.user_id == current_user.id %}
    <div class="actions">
     <a class="button button--primary" href="{{ url_for('screenings', library=library.id) }}">Screen this library</a>
   </div>
+  {% endif %}
 </div>
 
 <dl class="stats">
