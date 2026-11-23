@@ -150,6 +150,8 @@ class Library(db.Model):
     name = db.Column(db.String(150), nullable=False)
     description = db.Column(db.Text)
     uploaded_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    user = db.relationship("AppUser", lazy="joined")
     # ------ Show user's libraries: counting compounds ------
     @property
     def compound_count(self):
@@ -816,9 +818,7 @@ def upload_libraries():
 @app.route('/libraries/<int:id>')
 @login_required
 def see_library(id):
-    library = db.get_or_404(Library, id)
-    if library.user_id != current_user.id:
-        abort(404)
+    library = library_or_404(id)
 
     query = select(CompoundLibrary).filter_by(library_id=library.id).order_by(CompoundLibrary.compound_id)
     pagination=db.paginate(query, per_page=10)
@@ -1222,6 +1222,13 @@ def alert_colors(mol, alerts):
                         colors[index] = color
     return colors
 
+# ------ Helper: ------
+def library_or_404(id):
+    library = db.get_or_404(Library, id)
+    if library.user_id != current_user.id and not is_curator():
+        abort(404)
+    return library
+
 # ------ Helper: validates, describes and saves one batch of lines into a library ------
 def save_batch(library, text, start, patterns):
     """Saves the compounds of a batch of lines (or of a whole file) into the library.
@@ -1289,7 +1296,9 @@ def compile_alerts():
 # ------ Helper: finds user's libraries ------
 def user_libraries(q):
     # ------ Show user's libraries and find matching libraries name ------
-    query = select(Library).filter_by(user_id=current_user.id).order_by(Library.uploaded_at.desc())
+    query = select(Library).order_by(Library.uploaded_at.desc())
+    if not is_curator():
+        query=query.where(Library.user_id == current_user.id)
     # ------ Filter ONLY if there is something to filter ------
     if q:
         query = query.where(Library.name.ilike(f"%{q}%"))
