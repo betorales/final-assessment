@@ -888,6 +888,21 @@ def filter_settings():
                            editing=editing, base=base,
                            selected_id=selected.id if selected else None)
 
+@app.route('/filter-settings/<int:id>/deactivate',methods=['POST'])
+@login_required
+def deactivate_profile(id):
+    profile=db.get_or_404(FilterProfile, id)
+    if profile.is_official:
+        if not is_curator():
+            abort(403)
+    elif profile.user_id != current_user.id:
+        abort(404)
+    profile.is_active = False
+    db.session.commit()
+    state = "deactivated" if profile.is_official else "deleted"
+    flash(f"Profile {profile.name } has been {state}", "success")
+    return redirect(url_for('filter_settings'))
+    
 # ------ END FILTER SETTINGS ------
 
 

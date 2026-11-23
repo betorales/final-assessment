@@ -125,6 +125,13 @@ Filter Settings
         <a class="button" href="{{ url_for('filter_settings') }}">Cancel</a>
       </div>
     </form>
+    {% if editing %}
+    <form method="post" action="{{ url_for('deactivate_profile', id=editing.id) }}" onsubmit="return confirm('Remove this profile? Past screenings keep showing it')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="button button">{{ "Deactivate profile" if editing.is_official else "Delete profile" }}
+      </button>
+    </form>
+    {% endif %}
   </section>
 
 </div>
