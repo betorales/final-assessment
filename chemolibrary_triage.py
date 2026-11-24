@@ -958,7 +958,13 @@ def deactivate_profile(id):
 @curator_required
 def alerts():
     from rdkit import Chem
-    form = AlertForm()
+    alert_id = request.args.get('alert', type=int)
+    editing = None
+    if alert_id:
+        editing = db.get_or_404(StructuralAlert, alert_id)
+    form = AlertForm(obj=editing)
+    if editing:
+        form.editing_id=alert_id
     preview = None
 
     if request.method == 'POST':
@@ -969,22 +975,19 @@ def alerts():
         elif form.validate_on_submit():
             # Save an alert, match it against every loaded
             # compound and record the compound_alert rows.
-            alert=StructuralAlert()
-            form.populate_obj(alert)
-            db.session.add(alert)
-            db.session.flush()
-            pattern = Chem.MolFromSmarts(alert.smarts, mergeHs=True)
-            compounds = db.session.scalars(select(Compound).filter_by(out_of_scope=False)).all()
-            for compound in compounds:
-                mol = Chem.MolFromSmiles(compound.canonical_smiles)
-                matches = match_alerts(mol, [(alert.id, pattern)])
-                for alert_id, match_count in matches:
-                    compound_alert=CompoundAlert(
-                        compound_id=compound.id,
-                        alert_id=alert_id,
-                        match_count=match_count
-                    )
-                    db.session.add(compound_alert)
+            if editing:
+                smarts_changed= form.smarts.data != editing.smarts
+                form.populate_obj(editing)
+                if smarts_changed:
+                    db.session.execute(delete(CompoundAlert).where(CompoundAlert.alert_id==editing.id))
+                    record_alert_matches(editing)
+                flash(f"Alert {editing.name} updated", "success")
+            else:
+                alert=StructuralAlert()
+                form.populate_obj(alert)
+                db.session.add(alert)
+                db.session.flush()
+                record_alert_matches(alert)
             db.session.commit()
             return redirect(url_for('alerts'))
 
@@ -1006,8 +1009,7 @@ def alerts():
     for key, label in (("PAINS", "PAINS"), ("BRENK", "BRENK"), ("REACTIVE", "Reactive")):
         families.append(dict(key=key, label=label, count=db.session.scalar(select(func.count()).select_from(StructuralAlert).where(StructuralAlert.family.startswith(key)))))
 
-    return render_template('alerts.html', catalog=catalog, families=families,
-                           family=family, q=q, form=form, preview=preview)
+    return render_template('alerts.html', catalog=catalog, families=families,family=family, q=q, form=form, editing=editing, preview=preview)
 
 @app.route('/alerts/<int:id>/toggle', methods=['POST'])
 @curator_required
@@ -1050,8 +1052,13 @@ class AlertForm(FlaskForm):
     description = TextAreaField("Description", validators=[Optional()])
     reference = StringField("Reference", validators=[Optional(), Length(max=255)])
 
+    editing_id = None
     def validate_name(self, field):
-        if db.session.scalar(select(StructuralAlert.id).filter_by(name=field.data)):
+        query = select(StructuralAlert.id).where(StructuralAlert.name == field.data)
+        # ------ When editing, the alert itself does not count as a duplicate ------
+        if self.editing_id is not None:
+            query = query.where(StructuralAlert.id != self.editing_id)
+        if db.session.scalar(query):
             raise ValidationError("This name is already used.")
 
 # ------ Add alerts ------
@@ -1247,6 +1254,22 @@ def compound_structure(id):
     svg = draw_structure(mol, atom_colors)
     return Response(svg, mimetype="image/svg+xml", headers={"Cache-Control": "private, max-age=600"})
 
+# ------ Helper: matches one alert against every loaded compound and records the compound_alert rows ------
+def record_alert_matches(alert):
+    from rdkit import Chem
+    pattern = Chem.MolFromSmarts(alert.smarts, mergeHs=True)
+    compounds = db.session.scalars(select(Compound).filter_by(out_of_scope=False)).all()
+    for compound in compounds:
+        mol = Chem.MolFromSmiles(compound.canonical_smiles)
+        matches = match_alerts(mol, [(alert.id, pattern)])
+        for alert_id, match_count in matches:
+            compound_alert=CompoundAlert(
+                compound_id=compound.id,
+                alert_id=alert_id,
+                match_count=match_count
+            )
+            db.session.add(compound_alert)
+
 # ------ Helper: Draw a compound ------
 def draw_structure(mol, atom_colors):
     from rdkit.Chem.Draw import rdMolDraw2D
@@ -1388,7 +1411,7 @@ def preview_pattern(smarts):
             matches.append(compound.name)
     return {"matches": matches, "total": len(compounds)}
 
-# ------ RNF-11: own error pages. Readable messages, no technical details; Flask logs the exception itself ------
+# ------ Own error pages. Readable messages, no technical details; Flask logs the exception itself ------
 ERROR_MESSAGES = {
     400: ("Bad request", "The request could not be processed. Go back and try again."),
     403: ("Access denied", "Your account does not have permission to open this page."),

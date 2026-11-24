@@ -66,6 +66,8 @@ Alerts
           <td role="cell" data-label="Status">{{ "Active" if a.is_active else "Inactive" }}</td>
           <td role="cell" class="cell-actions">
             <div class="row-actions">
+              {# RF-11: Edit only opens the form, so it is a link. It keeps the family filter and the search. #}
+              <a class="button" href="{{ url_for('alerts', alert=a.id, family=family, q=q) }}">Edit<span class="sr-only"> {{ a.name }}</span></a>
               {# Deactivate instead of delete: compound_alert rows and past
                  screenings still point to this alert. #}
               <form method="post" action="{{ url_for('toggle_alert', id=a.id) }}">
@@ -95,7 +97,9 @@ Alerts
 
 
   <section class="side-column card card--stacked" aria-labelledby="new-alert-title">
-    <h2 id="new-alert-title" class="subheading">New alert</h2>
+    <h2 id="new-alert-title" class="subheading">
+      {%- if editing %}Edit “{{ editing.name }}”{% else %}New alert{% endif -%}
+    </h2>
 
     <form class="form-stack" method="post" novalidate>
       {{ form.hidden_tag() }}
@@ -131,7 +135,8 @@ Alerts
       {# "Test pattern" comes first because it is the button Enter triggers. #}
       <div class="row">
         <button type="submit" name="action" value="preview" class="button">Test pattern</button>
-        <button type="submit" name="action" value="save" class="button button--primary">Save alert</button>
+        <button type="submit" name="action" value="save" class="button button--primary">{{ "Save changes" if editing else "Save alert" }}</button>
+        {% if editing %}<a class="button" href="{{ url_for('alerts', family=family, q=q) }}">Cancel</a>{% endif %}
       </div>
     </form>
   </section>
