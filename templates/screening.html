@@ -31,6 +31,7 @@ Screening
    <div><dt>Evaluated</dt><dd>{{ screening.total_evaluated }}</dd></div>
    {# ------ Share of approved compounds; an empty library has nothing to divide ------ #}
    {% set out_of_scope = (chips | selectattr("key", "equalto", "out_of_scope") | first).count %}
+   {% set percent = (screening.total_passed / screening.total_evaluated * 100)|round(1) if screening.total_evaluated else 0 %}
    <div><dt>Passed</dt><dd>{{ screening.total_passed }} <span class="caption">({{ percent }} %)</span></dd></div>
    <div><dt>Rejected</dt><dd>{{ screening.total_evaluated - screening.total_passed - out_of_scope }}</dd></div>
    {% if out_of_scope %}<div><dt>Out of scope</dt><dd>{{ out_of_scope }}</dd></div>{% endif %}
