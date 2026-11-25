@@ -60,9 +60,10 @@ Una aclaración que me importa, porque es la que me permite dormir tranquilo: **
 - **Carga de quimiotecas** desde archivos SMILES, con validación línea por línea y deduplicación por SMILES canónico.
 - **Cálculo de descriptores** con RDKit sobre la estructura, no importados de la fuente externa (que, como vimos, los deja vacíos justo en los casos interesantes).
 - **Perfiles de filtro configurables**, almacenados como datos y no como código: Lipinski, Veber, Lead-like, Fragmentos (Ro3), beyond Ro5, CNS, más los que cada usuario cree.
-- **Alertas estructurales** por subestructura (PAINS y BRENK), con severidad diferenciada: PAINS descarta, BRENK solo advierte.
+- **Alertas estructurales** por subestructura: las 480 PAINS que trae RDKit, cargadas como discard. Cada alerta tiene su propia severidad: discard rechaza el compuesto y warning solo lo advierte.
 - **Trazabilidad del descarte**: cada rechazo guarda qué regla se incumplió y con qué valor.
 - **Dos perfiles de usuario**: el investigador aplica los criterios, el curador científico los define.
+- **Resultados filtrables y ordenables**, con la estructura 2D de cada compuesto, sus alertas resaltadas y exportación a CSV.
 
 ---
 
@@ -78,13 +79,13 @@ Una aclaración que me importa, porque es la que me permite dormir tranquilo: **
 | Quimioinformática | RDKit |
 | Autenticación | Flask-Login + Werkzeug |
 | Formularios y CSRF | Flask-WTF |
-| Frontend | CSS propio (Grid y Flexbox) + JavaScript vanilla |
+| Frontend | CSS propio (Grid y Flexbox) y JavaScript |
 
 > [!NOTE] 
 > Sin Bootstrap, sin plantillas y sin React. 
 > Las dos primeras ausencias las pide la consigna de la asignatura. 
 > La tercera es una decisión: Flask con Jinja2 ya cubre front y back, y agregar una segunda aplicación con su propio build no aportaría nada a lo que se evalúa. 
-> La interactividad que el proyecto necesita (ordenar la tabla, filtrar, barra de progreso) se resuelve con unas pocas líneas de JavaScript.
+> La interactividad que el proyecto necesita se resuelve con unas pocas líneas de JavaScript (por ejemplo, la barra de carga de compuestos y la separación por lotes).
 
 ### Rendimiento: carga por lotes
 
@@ -132,6 +133,7 @@ Todo software de quimioinformática tiene un límite. Los de este están documen
 2. **LogP es un valor calculado**, no experimental. Algoritmos distintos dan resultados distintos para la misma molécula.
 3. **Las alertas PAINS son heurísticas.** Hay fármacos aprobados que contienen subestructuras marcadas, y el sistema las detecta: la **levodopa** y la **entacapona** (Parkinson) activan `catechol_A(92)`, y el **epalrestat** (neuropatía diabética) activa `ene_rhod_A(235)`. Por eso el curador puede desactivar una alerta, y cada descarte por alerta queda escrito con su nombre.
 4. **El sistema no predice ADME.** Clasifica según criterios explícitos y guarda cuáles fueron.
+5. Catálogo BRENK precargado: RDKit no lo incluye como texto SMARTS (ver la decisión 5 de alertas). El curador puede agregar alertas de familia BRENK una por una desde Alerts.
 
 ### Fuera de alcance de esta entrega
  
@@ -139,6 +141,8 @@ Todo software de quimioinformática tiene un límite. Los de este están documen
 - Descriptores dependientes de conformación 3D y acoplamiento molecular.
 - Importación en línea desde la API de ChEMBL.
 - Validación experimental de los perfiles contra datos de biodisponibilidad.
+- Ordenar los resultados en pantallas de menos de 890 px: en el modo tarjetas, los encabezados de la tabla quedan ocultos.
+- Reactivar desde la interfaz un perfil oficial desactivado. Hoy solo se puede con SQL
 
 ---
 
@@ -169,6 +173,11 @@ Todo software de quimioinformática tiene un límite. Los de este están documen
 1. Los permisos se comprueban en el servidor, en cada ruta. Ocultar un botón en la interfaz no es seguridad: un formulario se puede enviar a mano.
 2. Un recurso ajeno (una biblioteca o un cribado de otro usuario) responde **404** y no 403, para no confirmar que existe. Una página reservada al curador responde **403**, porque su existencia no es un secreto.
 3. Un curador no puede desactivar su propia cuenta ni cambiar su propio rol, para que el sistema nunca quede sin nadie que lo administre.
+
+**Perfiles y alertas**
+
+1. Borrar un perfil es en realidad desactivarlo (`is_active = False`). Cada cribado guarda el perfil con que se ejecutó, así que un borrado real fallaría por la clave foránea, y además se perdería la evidencia de qué criterios se aplicaron.
+2. Editar una alerta no cambia los cribados anteriores, porque cada resultado guardó su motivo al ejecutarse. Si cambia el SMARTS, solo se recalculan las coincidencias de esa alerta en `compound_alert`.
 
 ---
 
