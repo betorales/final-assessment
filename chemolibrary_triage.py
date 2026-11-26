@@ -583,7 +583,7 @@ def users():
 def toggle_user(id):
     user=db.get_or_404(AppUser, id)
     if user.id==current_user.id:
-        flash("You can’t deactivate your own account")
+        flash("You can’t deactivate your own account", "error")
         return redirect(url_for('users'))
     user.is_active=not user.is_active
     db.session.commit()

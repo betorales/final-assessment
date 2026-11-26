@@ -57,7 +57,7 @@
   --accent: #22303c;
   --accent-on: var(--ink-inverse);
   --accent-muted: #e6e9ec;
-  --accent-hover: #2d3d4b;  
+  --accent-hover: #1d4c80;  
 
   --state-pass: #1d4c80;
   --state-pass-bg: #e4edf8;
@@ -66,6 +66,9 @@
   --state-warn: var(--ink-secondary);
   --state-out-of-scope: var(--ink-muted);
   --focus-ring: #1d4c80;
+
+  --sucess: #17704f;
+  --success-accent: #30b683;
 
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
@@ -121,10 +124,10 @@ legend { padding: 0; }
 img, svg { display: block; max-width: 100%; }
 
 a {
-  color: var(--state-pass);
+  color: var(--ink-primary);
   text-underline-offset: 3px;
 }
-a:hover { color: var(--ink-primary); }
+a:hover { color: var(--accent-hover); }
 
 :focus-visible {
   outline: var(--bw-focus) solid var(--focus-ring);
@@ -1063,7 +1066,7 @@ a.chip[aria-current="true"]:hover {
 }
 
 @media (min-width: 768px) {
-  .table { display: table; }
+  .table { display: table; text-align: center;}
   .table thead {
     display: table-header-group;
     position: static;
@@ -1400,8 +1403,9 @@ a.chip[aria-current="true"]:hover {
   font-size: 14px;
   line-height: 20px;
 }
+
 .flash > svg { flex: none; margin-top: 2px; }
-.flash--success { border-left-color: var(--state-pass); }
+.flash--success { border-left-color: var(--success-accent); color: var(--sucess); font-weight: 600;}
 .flash--error { border-left-color: var(--state-fail); color: var(--state-fail); font-weight: 600; }
 
 .empty-state {
